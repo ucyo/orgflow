@@ -1,13 +1,14 @@
 use std::io;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Layout},
     prelude::Line,
     style::Stylize,
-    widgets::{Widget, block::title},
+    widgets::{Block, Borders, Widget},
 };
+use tui_textarea::TextArea;
 
 fn main() -> io::Result<()> {
     // Initialise terminal and move to raw mode
@@ -24,13 +25,18 @@ fn main() -> io::Result<()> {
     app_result
 }
 
-struct App {
+struct App<'a> {
     exit: bool,
+    note: TextArea<'a>,
 }
 
-impl App {
+impl<'a> App<'a> {
     fn new() -> Self {
-        App { exit: false }
+        let ta = TextArea::default();
+        App {
+            exit: false,
+            note: ta,
+        }
     }
     /// Start the application
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -40,8 +46,10 @@ impl App {
             terminal.draw(|frame| self.draw(frame))?;
 
             // wait for key events and handle them locally in the application
-            match crossterm::event::read()? {
-                crossterm::event::Event::Key(key_event) => self.handle_key_event(key_event)?,
+            match ratatui::crossterm::event::read()? {
+                ratatui::crossterm::event::Event::Key(key_event) => {
+                    self.handle_key_event(key_event)?
+                }
                 _ => {}
             }
         }
@@ -53,17 +61,27 @@ impl App {
     }
 
     /// Look for key presses and handle event
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> io::Result<()> {
+    fn handle_key_event(
+        &mut self,
+        key_event: ratatui::crossterm::event::KeyEvent,
+    ) -> io::Result<()> {
         match (key_event.kind, key_event.code) {
-            (KeyEventKind::Press, KeyCode::Char('q')) => self.exit = true,
-            _ => (),
+            (KeyEventKind::Press, KeyCode::Esc) => self.exit = true,
+            _ => self.handle_other_key_event(key_event)?, // Handle all other key events by sending them to content
+                                                          // TODO: Should check which layout is active
         }
+        Ok(())
+    }
+
+    /// Handle content input to textarea
+    fn handle_other_key_event(&mut self, key_event: KeyEvent) -> io::Result<()> {
+        self.note.input(key_event);
         Ok(())
     }
 }
 
 /// Give App itself the ability to be a Widget (if there is only one widget )
-impl Widget for &App {
+impl<'a> Widget for &App<'a> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
@@ -75,8 +93,20 @@ impl Widget for &App {
         // Split input area in above layout
         let [title_area, content_area] = vertical_layout.areas(area);
 
-        // Render contents in the verical areas
+        // Render title in the vertical area
         Line::from("Orgmode").bold().render(title_area, buf);
-        Line::from("Content").bold().render(content_area, buf);
+
+        // Define content for the note inputs: content (text_area), title (instructions), border (block)
+        let mut text_area = TextArea::from(self.note.clone());
+        let note_instructions =
+            Line::from(vec![" Quit ".into(), "<ESC> ".blue().bold()]).centered();
+        let note_block = Block::default()
+            .borders(Borders::ALL)
+            .title("Content")
+            .title_bottom(note_instructions);
+
+        // Render each of the contents
+        text_area.set_block(note_block);
+        text_area.render(content_area, buf);
     }
 }
