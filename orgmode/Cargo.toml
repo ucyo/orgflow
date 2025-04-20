@@ -1,0 +1,21 @@
+[package]
+name = "orgmode"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.40"
+config = "0.15.11"
+
+[dependencies.uuid]
+version = "1.16.0"
+# Lets you generate random UUIDs
+features = ["v4"]
+
+[[bin]]
+name = "orgmode"
+path = "src/main.rs"
+
+[lib]
+name = "orgmode"
+path = "src/lib/mod.rs"

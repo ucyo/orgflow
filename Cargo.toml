@@ -1,0 +1,3 @@
+[workspace]
+members = ["orgmode", "orgmode-tui"]
+resolver = "2"
