@@ -1,6 +1,7 @@
 use std::io;
 
 use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+use ratatui::layout::{Direction, Rect};
 use ratatui::prelude::Color;
 use ratatui::style::Style;
 use ratatui::{
@@ -32,7 +33,8 @@ struct App {
     note: TextArea<'static>,
     title: TextArea<'static>,
     note_focus: NoteFocus,
-    tab_index: usize,
+    scratchpad: TextArea<'static>,
+    scratchpad_visible: bool,
 }
 
 enum NoteFocus {
@@ -44,14 +46,18 @@ impl<'a> App {
     fn new() -> Self {
         let note = TextArea::default();
         let title = TextArea::default();
+        let scratchpad = TextArea::default();
+
         let focus = NoteFocus::Title;
         let exit = false;
+        let scratchpad_visible = false;
         App {
             exit,
             note,
             title,
             note_focus: focus,
-            tab_index: 0,
+            scratchpad,
+            scratchpad_visible,
         }
     }
     /// Start the application
@@ -85,9 +91,12 @@ impl<'a> App {
             (KeyEventKind::Press, KeyCode::Char('t'), _)
                 if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
             {
-                self.tab_index = (self.tab_index + 1) % 2
+                self.scratchpad_visible = !self.scratchpad_visible;
             }
             (KeyEventKind::Press, KeyCode::Esc, _) => self.exit = true,
+            (_, _, _) if self.scratchpad_visible => {
+                self.scratchpad.input(key_event);
+            }
             (KeyEventKind::Press, KeyCode::BackTab, NoteFocus::Content) => {
                 self.note_focus = NoteFocus::Title
             }
@@ -110,9 +119,7 @@ impl<'a> Widget for &App {
     where
         Self: Sized,
     {
-        match self.tab_index {
-            _ => render_note(self, area, buf),
-        }
+        render_note(self, area, buf)
     }
 }
 
@@ -128,16 +135,18 @@ fn render_note(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui::prelu
     let [appname_area, title_area, content_area] = vertical_layout.areas(area);
 
     // Render title in the vertical area
-    Line::from(format!("{}", app.tab_index))
+    Line::from("Orgmode")
         .bold()
         .centered()
         .render(appname_area, buf);
 
     // Define title area and its content
     let mut title = TextArea::from(app.title.clone());
-    let title_block = Block::default().borders(Borders::ALL).title("Titel");
+    let title_block = Block::default().borders(Borders::ALL).title("Title");
     let title_block = match app.note_focus {
-        NoteFocus::Title => title_block.style(Style::default().fg(Color::Yellow)),
+        NoteFocus::Title if !app.scratchpad_visible => {
+            title_block.style(Style::default().fg(Color::Yellow))
+        }
         _ => title_block,
     };
 
@@ -157,9 +166,24 @@ fn render_note(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui::prelu
         .title("Content")
         .title_bottom(note_instructions);
     let note_block = match app.note_focus {
-        NoteFocus::Content => note_block.style(Style::default().fg(Color::Yellow)),
+        NoteFocus::Content if !app.scratchpad_visible => {
+            note_block.style(Style::default().fg(Color::Yellow))
+        }
         _ => note_block,
     };
+
+    let mut scratchpad = TextArea::from(app.scratchpad.clone());
+    let scratchpad_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Task")
+        .style(Style::default().fg(Color::Yellow));
+
+    let scratchpad_area = centered_rect(60, 10, area);
+
+    if app.scratchpad_visible {
+        scratchpad.set_block(scratchpad_block);
+        scratchpad.render(scratchpad_area, buf);
+    }
 
     // Render each of the contents
     text_area.set_block(note_block);
@@ -167,4 +191,24 @@ fn render_note(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui::prelu
 
     title.set_block(title_block);
     title.render(title_area, buf);
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Length(3),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(area);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
 }
