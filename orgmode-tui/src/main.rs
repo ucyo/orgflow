@@ -1,4 +1,7 @@
+use orgmode::{Note, OrgDocument, Task};
 use std::io;
+use std::io::Result as IoResult;
+use std::str::FromStr;
 
 use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Direction, Rect};
@@ -18,17 +21,20 @@ fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
 
     // Create app and run for infinite loop
-    let mut app = App::new();
+    let mut app = App::new()?;
     let app_result = app.run(&mut terminal);
 
     // Disable raw mode
     ratatui::restore();
 
     // Return application exit code
+    print!("{:#?}", app.document.tasks);
     app_result
 }
 
+#[derive(Debug)]
 struct App {
+    document: OrgDocument,
     exit: bool,
     note: TextArea<'static>,
     title: TextArea<'static>,
@@ -37,28 +43,33 @@ struct App {
     scratchpad_visible: bool,
 }
 
+#[derive(Debug)]
 enum NoteFocus {
     Title,
     Content,
 }
 
 impl<'a> App {
-    fn new() -> Self {
+    fn new() -> IoResult<Self> {
         let note = TextArea::default();
         let title = TextArea::default();
         let scratchpad = TextArea::default();
+        let p = "/workspaces/org-modes/orgmode/tests/document.md";
+        let document = OrgDocument::from(p)?;
 
         let focus = NoteFocus::Title;
         let exit = false;
         let scratchpad_visible = false;
-        App {
+        let app = App {
+            document,
             exit,
             note,
             title,
             note_focus: focus,
             scratchpad,
             scratchpad_visible,
-        }
+        };
+        Ok(app)
     }
     /// Start the application
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -75,6 +86,7 @@ impl<'a> App {
                 _ => {}
             }
         }
+        println!("{:#?}", self);
         Ok(())
     }
     /// Routine about how to draw each frame in application
@@ -94,6 +106,12 @@ impl<'a> App {
                 self.scratchpad_visible = !self.scratchpad_visible;
             }
             (KeyEventKind::Press, KeyCode::Esc, _) => self.exit = true,
+            (KeyEventKind::Press, KeyCode::Enter, _) if self.scratchpad_visible => {
+                let task = self.scratchpad.lines().first().unwrap();
+                let t = Task::with_today(task);
+                self.document.push_task(t);
+                self.scratchpad = TextArea::default()
+            }
             (_, _, _) if self.scratchpad_visible => {
                 self.scratchpad.input(key_event);
             }
@@ -157,7 +175,7 @@ fn render_note(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui::prelu
         "<ESC> ".blue().bold(),
         "Switch ".into(),
         "<SHIFT>+<TAB> ".blue().bold(),
-        "Switch Tabs ".into(),
+        "Enter Task ".into(),
         "<CTRL>+<T> ".blue().bold(),
     ])
     .centered();

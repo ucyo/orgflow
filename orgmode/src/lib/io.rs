@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::io::Result as IoResult;
 use std::io::{self, BufRead, Seek, Write};
 use std::str::FromStr;
 use std::vec;
@@ -59,10 +60,10 @@ impl OrgDocument {
         let buf = io::BufWriter::new(file);
         self.write(buf)
     }
-    pub fn from(path: &str) -> Result<Self, String> {
+    pub fn from(path: &str) -> IoResult<Self> {
         let mut parser = OrgDocumentParser::default();
         let mut doc = OrgDocument::default();
-        let file = File::open(path).ok().ok_or("Can not read file")?;
+        let file = File::open(path)?;
         let lines = io::BufReader::new(file).lines();
         for line in lines.map_while(Result::ok) {
             if !line.is_empty() {
@@ -92,7 +93,7 @@ impl Default for OrgDocumentParser {
 }
 
 impl OrgDocumentParser {
-    fn parse(&mut self, line: &str, doc: &mut OrgDocument) -> Result<(), String> {
+    fn parse(&mut self, line: &str, doc: &mut OrgDocument) -> IoResult<()> {
         match (&self, line) {
             (OrgDocumentParser::BeforeTasks, "## Tasks") => *self = OrgDocumentParser::InTasks,
             (OrgDocumentParser::InTasks, "## Notes") => {
@@ -132,7 +133,7 @@ impl OrgDocumentParser {
         }
         Ok(())
     }
-    fn finish(&mut self, doc: &mut OrgDocument) -> Result<(), String> {
+    fn finish(&mut self, doc: &mut OrgDocument) -> IoResult<()> {
         match self {
             OrgDocumentParser::InNotes(vec) => {
                 if !vec.is_empty() {

@@ -26,6 +26,11 @@ impl Task {
             ..Default::default()
         }
     }
+    pub fn with_today(description: &str) -> Self {
+        let mut t = Self::from_str(description).unwrap();
+        t.creation_date = Some(Date::now());
+        t
+    }
 }
 
 fn _is_prefix(s: &str) -> bool {
