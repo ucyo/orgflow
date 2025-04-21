@@ -2,6 +2,8 @@ use std::io;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
+use ratatui::prelude::Color;
+use ratatui::style::Style;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Layout},
@@ -30,16 +32,26 @@ struct App {
     exit: bool,
     note: TextArea<'static>,
     title: TextArea<'static>,
+    focus: AppFocus,
+}
+
+#[derive(PartialEq)]
+enum AppFocus {
+    Title,
+    Content,
 }
 
 impl<'a> App {
     fn new() -> Self {
-        let ta = TextArea::default();
+        let note = TextArea::default();
         let title = TextArea::default();
+        let focus = AppFocus::Title;
+        let exit = false;
         App {
-            exit: false,
-            note: ta,
+            exit,
+            note,
             title,
+            focus,
         }
     }
     /// Start the application
@@ -69,17 +81,16 @@ impl<'a> App {
         &mut self,
         key_event: ratatui::crossterm::event::KeyEvent,
     ) -> io::Result<()> {
-        match (key_event.kind, key_event.code) {
-            (KeyEventKind::Press, KeyCode::Esc) => self.exit = true,
-            _ => self.handle_other_key_event(key_event)?, // Handle all other key events by sending them to content
-                                                          // TODO: Should check which layout is active
+        match (key_event.kind, key_event.code, &self.focus) {
+            (KeyEventKind::Press, KeyCode::Esc, _) => self.exit = true,
+            (KeyEventKind::Press, KeyCode::Tab, AppFocus::Content) => self.focus = AppFocus::Title,
+            (KeyEventKind::Press, KeyCode::Tab, AppFocus::Title) => self.focus = AppFocus::Content,
+            (KeyEventKind::Press, KeyCode::Enter, AppFocus::Title) => {
+                self.focus = AppFocus::Content
+            }
+            (_, _, AppFocus::Content) => _ = self.note.input(key_event),
+            (_, _, AppFocus::Title) => _ = self.title.input(key_event),
         }
-        Ok(())
-    }
-
-    /// Handle content input to textarea
-    fn handle_other_key_event(&mut self, key_event: KeyEvent) -> io::Result<()> {
-        self.note.input(key_event);
         Ok(())
     }
 }
@@ -106,6 +117,28 @@ impl<'a> Widget for &App {
         // Define title area and its content
         let mut title = TextArea::from(self.title.clone());
         let title_block = Block::default().borders(Borders::ALL).title("Titel");
+        let title_block = match self.focus {
+            AppFocus::Title => title_block.style(Style::default().fg(Color::Yellow)),
+            _ => title_block,
+        };
+
+        // Define content for the note inputs: content (text_area), title (instructions), border (block)
+        let mut text_area = TextArea::from(self.note.clone());
+        let note_instructions =
+            Line::from(vec![" Quit ".into(), "<ESC> ".blue().bold()]).centered();
+        let note_block = Block::default()
+            .borders(Borders::ALL)
+            .title("Content")
+            .title_bottom(note_instructions);
+        let note_block = match self.focus {
+            AppFocus::Content => note_block.style(Style::default().fg(Color::Yellow)),
+            _ => note_block,
+        };
+
+        // Render each of the contents
+        text_area.set_block(note_block);
+        text_area.render(content_area, buf);
+
         title.set_block(title_block);
         title.render(
             Rect {
@@ -116,18 +149,5 @@ impl<'a> Widget for &App {
             },
             buf,
         );
-
-        // Define content for the note inputs: content (text_area), title (instructions), border (block)
-        let mut text_area = TextArea::from(self.note.clone());
-        let note_instructions =
-            Line::from(vec![" Quit ".into(), "<ESC> ".blue().bold()]).centered();
-        let note_block = Block::default()
-            .borders(Borders::ALL)
-            .title("Content")
-            .title_bottom(note_instructions);
-
-        // Render each of the contents
-        text_area.set_block(note_block);
-        text_area.render(content_area, buf);
     }
 }
