@@ -1,6 +1,7 @@
 use std::io;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use ratatui::layout::Rect;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Layout},
@@ -25,17 +26,20 @@ fn main() -> io::Result<()> {
     app_result
 }
 
-struct App<'a> {
+struct App {
     exit: bool,
-    note: TextArea<'a>,
+    note: TextArea<'static>,
+    title: TextArea<'static>,
 }
 
-impl<'a> App<'a> {
+impl<'a> App {
     fn new() -> Self {
         let ta = TextArea::default();
+        let title = TextArea::default();
         App {
             exit: false,
             note: ta,
+            title,
         }
     }
     /// Start the application
@@ -81,20 +85,37 @@ impl<'a> App<'a> {
 }
 
 /// Give App itself the ability to be a Widget (if there is only one widget )
-impl<'a> Widget for &App<'a> {
+impl<'a> Widget for &App {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
     {
         // Create a vertical layout via percentages
-        let vertical_layout =
-            Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)]);
+        let vertical_layout = Layout::vertical([
+            Constraint::Percentage(5),
+            Constraint::Percentage(15),
+            Constraint::Percentage(80),
+        ]);
 
         // Split input area in above layout
-        let [title_area, content_area] = vertical_layout.areas(area);
+        let [appname_area, title_area, content_area] = vertical_layout.areas(area);
 
         // Render title in the vertical area
-        Line::from("Orgmode").bold().render(title_area, buf);
+        Line::from("Orgmode").bold().render(appname_area, buf);
+
+        // Define title area and its content
+        let mut title = TextArea::from(self.title.clone());
+        let title_block = Block::default().borders(Borders::ALL).title("Titel");
+        title.set_block(title_block);
+        title.render(
+            Rect {
+                x: title_area.left(),
+                y: title_area.top(),
+                width: title_area.width,
+                height: 3,
+            },
+            buf,
+        );
 
         // Define content for the note inputs: content (text_area), title (instructions), border (block)
         let mut text_area = TextArea::from(self.note.clone());
