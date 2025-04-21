@@ -1,7 +1,6 @@
 use std::io;
 
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ratatui::layout::Rect;
+use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::prelude::Color;
 use ratatui::style::Style;
 use ratatui::{
@@ -32,11 +31,11 @@ struct App {
     exit: bool,
     note: TextArea<'static>,
     title: TextArea<'static>,
-    focus: AppFocus,
+    note_focus: NoteFocus,
+    tab_index: usize,
 }
 
-#[derive(PartialEq)]
-enum AppFocus {
+enum NoteFocus {
     Title,
     Content,
 }
@@ -45,13 +44,14 @@ impl<'a> App {
     fn new() -> Self {
         let note = TextArea::default();
         let title = TextArea::default();
-        let focus = AppFocus::Title;
+        let focus = NoteFocus::Title;
         let exit = false;
         App {
             exit,
             note,
             title,
-            focus,
+            note_focus: focus,
+            tab_index: 0,
         }
     }
     /// Start the application
@@ -81,15 +81,24 @@ impl<'a> App {
         &mut self,
         key_event: ratatui::crossterm::event::KeyEvent,
     ) -> io::Result<()> {
-        match (key_event.kind, key_event.code, &self.focus) {
-            (KeyEventKind::Press, KeyCode::Esc, _) => self.exit = true,
-            (KeyEventKind::Press, KeyCode::Tab, AppFocus::Content) => self.focus = AppFocus::Title,
-            (KeyEventKind::Press, KeyCode::Tab, AppFocus::Title) => self.focus = AppFocus::Content,
-            (KeyEventKind::Press, KeyCode::Enter, AppFocus::Title) => {
-                self.focus = AppFocus::Content
+        match (key_event.kind, key_event.code, &self.note_focus) {
+            (KeyEventKind::Press, KeyCode::Char('t'), _)
+                if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.tab_index = (self.tab_index + 1) % 2
             }
-            (_, _, AppFocus::Content) => _ = self.note.input(key_event),
-            (_, _, AppFocus::Title) => _ = self.title.input(key_event),
+            (KeyEventKind::Press, KeyCode::Esc, _) => self.exit = true,
+            (KeyEventKind::Press, KeyCode::BackTab, NoteFocus::Content) => {
+                self.note_focus = NoteFocus::Title
+            }
+            (KeyEventKind::Press, KeyCode::BackTab, NoteFocus::Title) => {
+                self.note_focus = NoteFocus::Content
+            }
+            (KeyEventKind::Press, KeyCode::Enter, NoteFocus::Title) => {
+                self.note_focus = NoteFocus::Content
+            }
+            (_, _, NoteFocus::Content) => _ = self.note.input(key_event),
+            (_, _, NoteFocus::Title) => _ = self.title.input(key_event),
         }
         Ok(())
     }
@@ -101,53 +110,61 @@ impl<'a> Widget for &App {
     where
         Self: Sized,
     {
-        // Create a vertical layout via percentages
-        let vertical_layout = Layout::vertical([
-            Constraint::Percentage(5),
-            Constraint::Percentage(15),
-            Constraint::Percentage(80),
-        ]);
-
-        // Split input area in above layout
-        let [appname_area, title_area, content_area] = vertical_layout.areas(area);
-
-        // Render title in the vertical area
-        Line::from("Orgmode").bold().render(appname_area, buf);
-
-        // Define title area and its content
-        let mut title = TextArea::from(self.title.clone());
-        let title_block = Block::default().borders(Borders::ALL).title("Titel");
-        let title_block = match self.focus {
-            AppFocus::Title => title_block.style(Style::default().fg(Color::Yellow)),
-            _ => title_block,
-        };
-
-        // Define content for the note inputs: content (text_area), title (instructions), border (block)
-        let mut text_area = TextArea::from(self.note.clone());
-        let note_instructions =
-            Line::from(vec![" Quit ".into(), "<ESC> ".blue().bold()]).centered();
-        let note_block = Block::default()
-            .borders(Borders::ALL)
-            .title("Content")
-            .title_bottom(note_instructions);
-        let note_block = match self.focus {
-            AppFocus::Content => note_block.style(Style::default().fg(Color::Yellow)),
-            _ => note_block,
-        };
-
-        // Render each of the contents
-        text_area.set_block(note_block);
-        text_area.render(content_area, buf);
-
-        title.set_block(title_block);
-        title.render(
-            Rect {
-                x: title_area.left(),
-                y: title_area.top(),
-                width: title_area.width,
-                height: 3,
-            },
-            buf,
-        );
+        match self.tab_index {
+            _ => render_note(self, area, buf),
+        }
     }
+}
+
+fn render_note(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+    // Create a vertical layout via length
+    let vertical_layout = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(3),
+        Constraint::Min(0),
+    ]);
+
+    // Split input area in above layout
+    let [appname_area, title_area, content_area] = vertical_layout.areas(area);
+
+    // Render title in the vertical area
+    Line::from(format!("{}", app.tab_index))
+        .bold()
+        .centered()
+        .render(appname_area, buf);
+
+    // Define title area and its content
+    let mut title = TextArea::from(app.title.clone());
+    let title_block = Block::default().borders(Borders::ALL).title("Titel");
+    let title_block = match app.note_focus {
+        NoteFocus::Title => title_block.style(Style::default().fg(Color::Yellow)),
+        _ => title_block,
+    };
+
+    // Define content for the note inputs: content (text_area), title (instructions), border (block)
+    let mut text_area = TextArea::from(app.note.clone());
+    let note_instructions = Line::from(vec![
+        " Quit ".into(),
+        "<ESC> ".blue().bold(),
+        "Switch ".into(),
+        "<SHIFT>+<TAB> ".blue().bold(),
+        "Switch Tabs ".into(),
+        "<CTRL>+<T> ".blue().bold(),
+    ])
+    .centered();
+    let note_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Content")
+        .title_bottom(note_instructions);
+    let note_block = match app.note_focus {
+        NoteFocus::Content => note_block.style(Style::default().fg(Color::Yellow)),
+        _ => note_block,
+    };
+
+    // Render each of the contents
+    text_area.set_block(note_block);
+    text_area.render(content_area, buf);
+
+    title.set_block(title_block);
+    title.render(title_area, buf);
 }
