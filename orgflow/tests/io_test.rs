@@ -1,10 +1,10 @@
-use config::Map;
-use orgmode::OrgDocument;
+use std::collections::HashMap;
+use orgflow::OrgDocument;
 use std::io::Cursor;
 
 #[test]
 fn read_document() {
-    let mut source_exp = Map::new();
+    let mut source_exp = HashMap::new();
     source_exp.insert("tests/document.md", (2, 3));
     source_exp.insert("tests/document_with_post.md", (2, 1));
 

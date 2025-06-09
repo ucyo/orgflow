@@ -1,12 +1,8 @@
-use orgmode::{Configuration, Note, OrgDocument, Task};
+use orgflow::{Configuration, Note, OrgDocument, Task};
 
 fn main() {
-    // Read config from loc
-    let loc = "/workspaces/org-mode/tests/config.toml";
-    let config = Configuration::with(loc);
-
-    // Get location of org files from config
-    let basefolder = config.get_or("basefolder", "/home/sweet/home");
+    // Get location of org files from environment
+    let basefolder = Configuration::basefolder();
     let refile = std::path::Path::new(&basefolder).join("refile.org");
     println!("{:?}", refile);
 

@@ -21,6 +21,34 @@ impl Note {
     pub fn new() -> Self {
         Self::default()
     }
+    
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+    
+    pub fn content(&self) -> &[String] {
+        &self.content
+    }
+    
+    pub fn creation_date(&self) -> &Date {
+        &self.creation_date
+    }
+    
+    pub fn modification_date(&self) -> &Date {
+        &self.modification_date
+    }
+    
+    pub fn guid(&self) -> &Guid {
+        &self.guid
+    }
+    
+    pub fn tags(&self) -> &TagCollection {
+        &self.tags
+    }
+    
+    pub fn level(&self) -> usize {
+        self.lvl
+    }
     pub fn with(title: String, content: Vec<String>) -> Self {
         Self {
             title,

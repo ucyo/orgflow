@@ -1,5 +1,5 @@
 [package]
-name = "orgmode-tui"
+name = "orgflow-tui"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,4 +7,4 @@ edition = "2024"
 crossterm = "0.29.0"
 ratatui = "0.29.0"
 tui-textarea = "0.7.0"
-orgmode = {path = "../orgmode"}
+orgflow = {path = "../orgflow"}

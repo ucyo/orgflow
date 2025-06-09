@@ -1,11 +1,10 @@
 [package]
-name = "orgmode"
+name = "orgflow"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 chrono = "0.4.40"
-config = "0.15.11"
 
 [dependencies.uuid]
 version = "1.16.0"
@@ -13,9 +12,9 @@ version = "1.16.0"
 features = ["v4"]
 
 [[bin]]
-name = "orgmode"
+name = "orgflow"
 path = "src/main.rs"
 
 [lib]
-name = "orgmode"
+name = "orgflow"
 path = "src/lib/mod.rs"

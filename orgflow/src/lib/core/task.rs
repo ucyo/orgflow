@@ -20,6 +20,30 @@ impl Task {
     pub fn new() -> Self {
         Self::default()
     }
+    
+    pub fn is_completed(&self) -> bool {
+        self.is_completed
+    }
+    
+    pub fn priority_level(&self) -> &Option<Priority> {
+        &self.priority_level
+    }
+    
+    pub fn completion_date(&self) -> &Option<Date> {
+        &self.completion_date
+    }
+    
+    pub fn creation_date(&self) -> &Option<Date> {
+        &self.creation_date
+    }
+    
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+    
+    pub fn tags(&self) -> &Option<TagCollection> {
+        &self.tags
+    }
     pub fn with_task(description: String) -> Self {
         Self {
             description,
