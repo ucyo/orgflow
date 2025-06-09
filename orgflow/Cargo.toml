@@ -2,6 +2,13 @@
 name = "orgflow"
 version = "0.1.0"
 edition = "2024"
+description = "A Rust library for managing documents with support for tasks and notes"
+license = "MIT"
+repository = "https://github.com/ucyo/orgflow"
+homepage = "https://github.com/ucyo/orgflow"
+documentation = "https://docs.rs/orgflow"
+keywords = ["productivity", "notes", "tasks", "organization"]
+categories = ["text-processing", "data-structures"]
 
 [dependencies]
 chrono = "0.4.40"
