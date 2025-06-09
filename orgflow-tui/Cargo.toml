@@ -1,6 +1,6 @@
 [package]
 name = "orgflow-tui"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A terminal user interface for orgflow - manage notes and tasks with a smooth workflow"
 license = "MIT"
@@ -9,9 +9,14 @@ homepage = "https://github.com/ucyo/orgflow"
 documentation = "https://docs.rs/orgflow-tui"
 keywords = ["tui", "terminal", "productivity", "notes", "organization"]
 categories = ["command-line-utilities", "text-processing"]
+readme = "../README.md"
 
 [dependencies]
 crossterm = "0.29.0"
 ratatui = "0.29.0"
 tui-textarea = "0.7.0"
-orgflow = { version = "0.1.0", path = "../orgflow" }
+orgflow = { version = "0.1.1", path = "../orgflow" }
+
+[[bin]]
+name = "orgflow"
+path = "src/main.rs"

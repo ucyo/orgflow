@@ -81,7 +81,7 @@ doc.push_note(note);
 doc.to("path/to/file.org")?;
 ```
 
-### Terminal Interface: `orgflow-tui`
+### Terminal Interface: `orgflow`
 
 A beautiful, responsive terminal interface featuring:
 
@@ -91,7 +91,7 @@ A beautiful, responsive terminal interface featuring:
 - Auto-save functionality with `Ctrl+S`
 - Smart field navigation
 
-#### Viewer Tab  
+#### Viewer Tab
 - Browse all saved notes
 - Split-panel layout (content + metadata)
 - Arrow key navigation
@@ -164,7 +164,7 @@ Next steps:
 - Set new milestones
 - Schedule follow-up meeting
 
-### Project Ideas  
+### Project Ideas
 > cre:2024-01-10 mod:2024-01-12 guid:def456... @ideas +innovation
 Ideas for improving the user experience:
 1. Better navigation
@@ -178,7 +178,7 @@ Ideas for improving the user experience:
 
 ```bash
 # Start the application
-orgflow-tui
+orgflow
 
 # Keyboard shortcuts:
 # 1 - Editor tab    2 - Viewer tab    3 - Tasks tab
@@ -195,15 +195,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get base folder from environment or use default
     let base_folder = Configuration::basefolder();
     let file_path = format!("{}/refile.org", base_folder);
-    
+
     // Load existing document or create new
     let mut doc = OrgDocument::from(&file_path)
         .unwrap_or_else(|_| OrgDocument::default());
-    
+
     // Add a new task
     let task = Task::with_today("Review pull requests");
     doc.push_task(task);
-    
+
     // Add a new note
     let note = Note::with(
         "Daily Standup".to_string(),
@@ -214,13 +214,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ]
     );
     doc.push_note(note);
-    
+
     // Save the document
     doc.to(&file_path)?;
-    
-    println!("Document saved with {} tasks and {} notes", 
+
+    println!("Document saved with {} tasks and {} notes",
              doc.len().0, doc.len().1);
-    
+
     Ok(())
 }
 ```
