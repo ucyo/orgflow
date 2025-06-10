@@ -23,12 +23,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Resume exactly where you left off, including cursor position and focus
   - Automatic detection of unsaved changes and draft content
   - Background session saving without blocking the UI
+- **Note Loading**: Robust handling of notes without content
+  - Fixed startup crashes when loading existing documents with contentless notes
+  - Relaxed validation to allow notes with only title and metadata
+  - Better error handling for malformed or incomplete note structures
 
 ### Technical
 - Added `serde` and `serde_json` dependencies for session serialization
 - New `session.rs` module with `SessionManager` and `SessionState` types
 - Integrated session management into main application event loop
 - Memory-efficient state tracking with minimal overhead
+
+### Fixed
+- **Document Loading**: Fixed panic when loading notes without content from refile.org files
+- **Note Parsing**: Relaxed validation requirements to allow notes with only title and metadata
+- **Keyboard Input**: Fixed Ctrl+S save functionality to work from any tab (not just Editor)
+- **Scratchpad Input**: Fixed tab switching (1-3) interfering with text input in scratchpad
+- **Base Path Configuration**: Improved default path logic using HOME environment variable
+- **File Operations**: Replaced unsafe try_into().unwrap() with safe into() conversions
+- **Content Validation**: Enhanced logic to distinguish meaningful content from whitespace
+- **Session Loading**: Added graceful error handling for corrupted session files
 
 ## [0.1.1] - 2024-01-XX
 
