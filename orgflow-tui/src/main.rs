@@ -2,6 +2,9 @@ use orgflow::{Configuration, Note, OrgDocument, Task};
 use std::io;
 use std::io::Result as IoResult;
 
+mod session;
+use session::{SessionManager, SessionState};
+
 use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Direction, Rect};
 use ratatui::prelude::Color;
@@ -42,6 +45,9 @@ struct App {
     current_tab: AppTab,
     current_note_index: usize,
     current_task_index: usize,
+    session_manager: SessionManager,
+    document_path: String,
+    has_unsaved_changes: bool,
 }
 
 #[derive(Debug)]
@@ -59,30 +65,73 @@ enum NoteFocus {
 
 impl<'a> App {
     fn new() -> IoResult<Self> {
-        let note = TextArea::default();
-        let title = TextArea::default();
-        let scratchpad = TextArea::default();
         let basefolder = Configuration::basefolder();
+        
+        // Ensure base folder exists with better error handling
+        if let Err(e) = std::fs::create_dir_all(&basefolder) {
+            eprintln!("Failed to create base folder '{}': {}", basefolder, e);
+            eprintln!("Try setting ORGFLOW_BASEFOLDER to a writable directory:");
+            eprintln!("  export ORGFLOW_BASEFOLDER=/tmp/orgflow");
+            return Err(e);
+        }
+        
         let refile_path = std::path::Path::new(&basefolder).join("refile.org");
-        let document = OrgDocument::from(refile_path.to_str().unwrap())?;
+        let document_path = refile_path.to_str().unwrap().to_string();
+        
+        // Load document or create empty one if file doesn't exist
+        let document = match OrgDocument::from(&document_path) {
+            Ok(doc) => doc,
+            Err(_) => OrgDocument::default(), // Create empty document if file doesn't exist
+        };
 
-        let focus = NoteFocus::Title;
-        let exit = false;
-        let scratchpad_visible = false;
-        let current_tab = AppTab::Editor;
-        let current_note_index = 0;
-        let current_task_index = 0;
+        // Initialize session manager
+        let session_file_path = std::path::Path::new(&basefolder).join("session.json");
+        let mut session_manager = SessionManager::new(session_file_path.to_str().unwrap().to_string());
+        
+        // Load existing session or create default
+        let session_state = match session_manager.load_session() {
+            Ok(state) => state,
+            Err(e) => {
+                eprintln!("Warning: Failed to load session, starting fresh: {}", e);
+                SessionState::default()
+            }
+        };
+        
+        // Restore UI state from session
+        let current_tab = session_state.current_tab;
+        // Ensure indices are within bounds for current document
+        let current_note_index = if session_state.current_note_index < document.notes.len() {
+            session_state.current_note_index
+        } else {
+            0
+        };
+        let current_task_index = if session_state.current_task_index < document.tasks.len() {
+            session_state.current_task_index
+        } else {
+            0
+        };
+        let note_focus = session_state.note_focus;
+        let scratchpad_visible = session_state.scratchpad_visible;
+
+        // Restore draft content from session
+        let title = SessionManager::restore_textarea(&session_state.title_content);
+        let note = SessionManager::restore_textarea(&session_state.note_content);
+        let scratchpad = SessionManager::restore_textarea(&session_state.scratchpad_content);
+
         let app = App {
             document,
-            exit,
+            exit: false,
             note,
             title,
-            note_focus: focus,
+            note_focus,
             scratchpad,
             scratchpad_visible,
             current_tab,
             current_note_index,
             current_task_index,
+            session_manager,
+            document_path,
+            has_unsaved_changes: session_state.has_unsaved_changes,
         };
         Ok(app)
     }
@@ -96,11 +145,22 @@ impl<'a> App {
             // wait for key events and handle them locally in the application
             match ratatui::crossterm::event::read()? {
                 ratatui::crossterm::event::Event::Key(key_event) => {
-                    self.handle_key_event(key_event)?
+                    self.handle_key_event(key_event)?;
+                    
+                    // Update session state after each keystroke
+                    self.update_session_state();
+                    
+                    // Check if we should save session (debounced)
+                    if self.session_manager.should_save() {
+                        let _ = self.session_manager.save_session();
+                    }
                 }
                 _ => {}
             }
         }
+        
+        // Force save session on exit
+        let _ = self.session_manager.force_save();
         Ok(())
     }
     /// Routine about how to draw each frame in application
@@ -119,18 +179,18 @@ impl<'a> App {
             &self.current_tab,
             &self.note_focus,
         ) {
-            // Tab switching
-            (KeyEventKind::Press, KeyCode::Char('1'), _, _) => {
+            // Tab switching - only when scratchpad is NOT visible
+            (KeyEventKind::Press, KeyCode::Char('1'), _, _) if !self.scratchpad_visible => {
                 self.current_tab = AppTab::Editor;
             }
-            (KeyEventKind::Press, KeyCode::Char('2'), _, _) => {
+            (KeyEventKind::Press, KeyCode::Char('2'), _, _) if !self.scratchpad_visible => {
                 self.current_tab = AppTab::Viewer;
                 // Reset note index if out of bounds
                 if self.current_note_index >= self.document.notes.len() {
                     self.current_note_index = 0;
                 }
             }
-            (KeyEventKind::Press, KeyCode::Char('3'), _, _) => {
+            (KeyEventKind::Press, KeyCode::Char('3'), _, _) if !self.scratchpad_visible => {
                 self.current_tab = AppTab::Tasks;
                 // Reset task index if out of bounds
                 if self.current_task_index >= self.document.tasks.len() {
@@ -164,6 +224,12 @@ impl<'a> App {
             {
                 self.scratchpad_visible = !self.scratchpad_visible;
             }
+            // Ctrl+S save - put this early to ensure it's not intercepted
+            (KeyEventKind::Press, KeyCode::Char('s'), _, _)
+                if key_event.modifiers.contains(KeyModifiers::CONTROL) && !self.scratchpad_visible =>
+            {
+                self.save_note()?;
+            }
             (KeyEventKind::Press, KeyCode::Esc, _, _) => self.exit = true,
             (KeyEventKind::Press, KeyCode::Enter, _, _) if self.scratchpad_visible => {
                 let task = self.scratchpad.lines().first().unwrap();
@@ -171,11 +237,10 @@ impl<'a> App {
                 self.document.push_task(t);
 
                 // Save to file immediately
-                let basefolder = Configuration::basefolder();
-                let refile_path = std::path::Path::new(&basefolder).join("refile.org");
-                let _ = self.document.to(refile_path.to_str().unwrap());
+                let _ = self.document.to(&self.document_path);
 
-                self.scratchpad = TextArea::default()
+                self.scratchpad = TextArea::default();
+                self.has_unsaved_changes = false;
             }
             (_, _, _, _) if self.scratchpad_visible => {
                 self.scratchpad.input(key_event);
@@ -192,11 +257,6 @@ impl<'a> App {
             }
             (KeyEventKind::Press, KeyCode::Tab, AppTab::Editor, NoteFocus::Title) => {
                 self.note_focus = NoteFocus::Content
-            }
-            (KeyEventKind::Press, KeyCode::Char('s'), AppTab::Editor, _)
-                if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
-            {
-                self.save_note()?;
             }
             (_, _, AppTab::Editor, NoteFocus::Content) => _ = self.note.input(key_event),
             (_, _, AppTab::Editor, NoteFocus::Title) => _ = self.title.input(key_event),
@@ -217,16 +277,38 @@ impl<'a> App {
             self.document.push_note(note);
 
             // Save to file
-            let basefolder = Configuration::basefolder();
-            let refile_path = std::path::Path::new(&basefolder).join("refile.org");
-            self.document.to(refile_path.to_str().unwrap())?;
+            self.document.to(&self.document_path)?;
 
             // Clear the text areas
             self.title = TextArea::default();
             self.note = TextArea::default();
             self.note_focus = NoteFocus::Title;
+            self.has_unsaved_changes = false;
         }
         Ok(())
+    }
+
+    /// Update session state with current application state
+    fn update_session_state(&mut self) {
+        // Check if there are unsaved changes in text areas
+        let has_draft_content = !self.title.lines().is_empty() || 
+                              !self.note.lines().is_empty() || 
+                              !self.scratchpad.lines().is_empty();
+        
+        let has_unsaved = self.has_unsaved_changes || has_draft_content;
+        
+        self.session_manager.update_state(
+            &self.current_tab,
+            self.current_note_index,
+            self.current_task_index,
+            &self.note_focus,
+            self.scratchpad_visible,
+            &self.title,
+            &self.note,
+            &self.scratchpad,
+            &self.document_path,
+            has_unsaved,
+        );
     }
 }
 
