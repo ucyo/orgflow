@@ -272,8 +272,18 @@ impl<'a> App {
         let title = self.title.lines().join(" ");
         let content: Vec<String> = self.note.lines().iter().map(|s| s.to_string()).collect();
 
-        if !title.trim().is_empty() || !content.is_empty() {
-            let note = Note::with(title, content);
+        // Check if we have any meaningful content
+        let has_title = !title.trim().is_empty();
+        let has_content = content.iter().any(|line| !line.trim().is_empty());
+
+        if has_title || has_content {
+            // Ensure we always have a non-empty title
+            let final_title = if title.trim().is_empty() {
+                "Untitled Note".to_string()
+            } else {
+                title
+            };
+            let note = Note::with(final_title, content);
             self.document.push_note(note);
 
             // Save to file

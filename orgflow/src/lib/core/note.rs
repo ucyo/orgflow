@@ -100,9 +100,9 @@ impl Into<Vec<String>> for &Note {
 
 impl Note {
     fn from_vec(value: Vec<String>) -> Result<Self, String> {
-        if value.len() < 3 {
+        if value.len() < 2 {
             return Err(format!(
-                "There should be at least a title, some metadata and content [{:?}]",
+                "There should be at least a title and metadata [{:?}]",
                 value
             ));
         }
@@ -204,6 +204,11 @@ mod tests {
                 "# Title",
                 "> cre:2022-03-03 mod:2021-03-01 guid:a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "- This is the content",
+            ],
+            // Note without content (just title and metadata)
+            vec![
+                "## Note Without Content",
+                "> cre:2022-03-03 mod:2021-03-01 guid:a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
             ],
         ];
         for case in cases {

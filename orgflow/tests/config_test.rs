@@ -3,20 +3,29 @@ use std::env;
 
 #[test]
 fn test_basefolder_default() {
-    // Save current env var
-    let original = env::var("ORGFLOW_BASEFOLDER").ok();
+    // Save current env vars
+    let original_basefolder = env::var("ORGFLOW_BASEFOLDER").ok();
+    let original_home = env::var("HOME").ok();
 
-    // Remove env var if set
+    // Remove env vars if set
     unsafe {
         env::remove_var("ORGFLOW_BASEFOLDER");
+        env::remove_var("HOME");
     }
 
-    assert_eq!(Configuration::basefolder(), "/custom/path");
+    // With no env vars, it should use ./orgflow
+    let result = Configuration::basefolder();
+    assert_eq!(result, "./orgflow");
 
-    // Restore original env var if it existed
-    if let Some(value) = original {
+    // Restore original env vars if they existed
+    if let Some(value) = original_basefolder {
         unsafe {
             env::set_var("ORGFLOW_BASEFOLDER", value);
+        }
+    }
+    if let Some(value) = original_home {
+        unsafe {
+            env::set_var("HOME", value);
         }
     }
 }
