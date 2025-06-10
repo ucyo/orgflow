@@ -40,6 +40,7 @@ orgflow = "0.1.0"
 ### Orgflow TUI (`orgflow-tui`)
 
 - **Three-Tab Interface**: Editor, Viewer, and Tasks views
+- **Session Management**: Automatic state persistence and recovery
 - **Real-time Editing**: Create and edit notes with immediate saving
 - **Task Management**: Visual task list with status tracking
 - **Note Browser**: Navigate through saved notes with metadata display
@@ -90,6 +91,7 @@ A beautiful, responsive terminal interface featuring:
 - Quick task entry with `Ctrl+T`
 - Auto-save functionality with `Ctrl+S`
 - Smart field navigation
+- Draft content automatically preserved between sessions
 
 #### Viewer Tab
 - Browse all saved notes
@@ -143,6 +145,24 @@ export ORGFLOW_BASEFOLDER=/path/to/your/notes
 
 Default location: `/home/sweet/home`
 
+### Session Management
+
+Orgflow TUI automatically manages your session state:
+
+- **Automatic Saving**: Session state is saved every 500ms after changes or every 50 keystrokes
+- **Draft Recovery**: Unsaved notes, tasks, and scratchpad content are preserved between sessions
+- **UI State Persistence**: Current tab, focus, and selection positions are restored on startup
+- **Session File**: State is stored in `session.json` in your base folder
+- **No Data Loss**: Even if the application crashes, your work is automatically recovered
+
+**Session includes:**
+- Current tab and focus position
+- Unsaved draft content (title, note content, scratchpad)
+- Navigation state (selected note/task indices)
+- UI preferences (scratchpad visibility)
+
+The session file is automatically created and managed - no manual intervention required.
+
 ### File Format
 
 Orgflow uses a structured text format:
@@ -183,7 +203,8 @@ orgflow
 # Keyboard shortcuts:
 # 1 - Editor tab    2 - Viewer tab    3 - Tasks tab
 # Ctrl+T - Quick task entry    Ctrl+S - Save note
-# Esc - Exit    Tab - Navigate fields
+# Esc - Exit (session auto-saved)    Tab - Navigate fields
+# Session state automatically preserved on every keystroke
 ```
 
 ### Library Usage
@@ -263,7 +284,8 @@ orgflow/
 │   └── tests/         # Integration tests
 ├── orgflow-tui/       # Terminal interface
 │   └── src/
-│       └── main.rs    # TUI application
+│       ├── main.rs    # TUI application
+│       └── session.rs # Session management
 ├── Cargo.toml         # Workspace configuration
 └── README.md          # This file
 ```
@@ -338,6 +360,8 @@ cargo check
 │ Navigate <↑↓> Quit <ESC>            │                      │
 └──────────────────────────────────────┴──────────────────────┘
 ```
+
+**Session Management**: All UI state and draft content is automatically preserved in `session.json`. Exit anytime with `ESC` and resume exactly where you left off!
 
 ## 🤝 Contributing
 
