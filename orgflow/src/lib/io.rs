@@ -42,7 +42,7 @@ impl OrgDocument {
         writeln!(buf, "## Notes")?;
         writeln!(buf, "")?;
         for note in self.notes.iter() {
-            let t: Vec<String> = note.try_into().unwrap();
+            let t: Vec<String> = note.into();
             for nline in t.iter() {
                 writeln!(buf, "{}", nline)?;
             }
