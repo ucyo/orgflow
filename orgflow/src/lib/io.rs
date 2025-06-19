@@ -4,8 +4,9 @@ use std::io::{self, BufRead, Seek, Write};
 use std::str::FromStr;
 use std::vec;
 
-use crate::Note;
-use crate::Task;
+use std::collections::HashSet;
+
+use crate::{Note, Task};
 
 #[derive(PartialEq, Debug, Default)]
 pub struct OrgDocument {
@@ -75,6 +76,132 @@ impl OrgDocument {
     }
     pub fn len(&self) -> (usize, usize) {
         (self.tasks.len(), self.notes.len())
+    }
+
+    /// Collect all unique tags from tasks and notes for autocompletion
+    pub fn collect_unique_tags(&self) -> TagSuggestions {
+        let mut context_tags = HashSet::new();
+        let mut project_tags = HashSet::new();
+        let mut person_tags = HashSet::new();
+        let mut custom_tags = HashSet::new();
+        let mut oneoff_tags = HashSet::new();
+
+        // Collect tags from tasks
+        for task in &self.tasks {
+            if let Some(tag_collection) = task.tags() {
+                context_tags.extend(tag_collection.context_tags());
+                project_tags.extend(tag_collection.project_tags());
+                person_tags.extend(tag_collection.person_tags());
+                custom_tags.extend(tag_collection.custom_tags());
+                oneoff_tags.extend(tag_collection.oneoff_tags());
+            }
+        }
+
+        // Collect tags from notes
+        for note in &self.notes {
+            let tag_collection = note.tags();
+            context_tags.extend(tag_collection.context_tags());
+            project_tags.extend(tag_collection.project_tags());
+            person_tags.extend(tag_collection.person_tags());
+            custom_tags.extend(tag_collection.custom_tags());
+            oneoff_tags.extend(tag_collection.oneoff_tags());
+        }
+
+        // Convert HashSets to sorted Vecs
+        let mut context: Vec<String> = context_tags.into_iter().collect();
+        let mut project: Vec<String> = project_tags.into_iter().collect();
+        let mut person: Vec<String> = person_tags.into_iter().collect();
+        let mut custom: Vec<String> = custom_tags.into_iter().collect();
+        let mut oneoff: Vec<String> = oneoff_tags.into_iter().collect();
+
+        context.sort();
+        project.sort();
+        person.sort();
+        custom.sort();
+        oneoff.sort();
+
+        TagSuggestions {
+            context,
+            project,
+            person,
+            custom,
+            oneoff,
+        }
+    }
+}
+
+/// Collection of tag suggestions for autocompletion
+#[derive(Debug, Clone)]
+pub struct TagSuggestions {
+    pub context: Vec<String>,   // @context
+    pub project: Vec<String>,   // +project
+    pub person: Vec<String>,    // p:person
+    pub custom: Vec<String>,    // key:value
+    pub oneoff: Vec<String>,    // !oneoff
+}
+
+impl TagSuggestions {
+    /// Get all tags as a flat list for general autocompletion
+    pub fn all_tags(&self) -> Vec<String> {
+        let mut all = Vec::new();
+        all.extend(self.context.clone());
+        all.extend(self.project.clone());
+        all.extend(self.person.clone());
+        all.extend(self.custom.clone());
+        all.extend(self.oneoff.clone());
+        all.sort();
+        all
+    }
+
+    /// Get suggestions that match a given prefix
+    pub fn matching_prefix(&self, prefix: &str) -> Vec<String> {
+        self.all_tags()
+            .into_iter()
+            .filter(|tag| tag.to_lowercase().starts_with(&prefix.to_lowercase()))
+            .collect()
+    }
+
+    /// Get suggestions for a specific tag type based on prefix
+    pub fn suggestions_for_prefix(&self, prefix: &str) -> Vec<String> {
+        if prefix.starts_with('@') {
+            // Context tags
+            self.context
+                .iter()
+                .filter(|tag| tag.to_lowercase().starts_with(&prefix.to_lowercase()))
+                .cloned()
+                .collect()
+        } else if prefix.starts_with('+') {
+            // Project tags
+            self.project
+                .iter()
+                .filter(|tag| tag.to_lowercase().starts_with(&prefix.to_lowercase()))
+                .cloned()
+                .collect()
+        } else if prefix.starts_with('p') && prefix.contains(':') {
+            // Person tags
+            self.person
+                .iter()
+                .filter(|tag| tag.to_lowercase().starts_with(&prefix.to_lowercase()))
+                .cloned()
+                .collect()
+        } else if prefix.starts_with('!') {
+            // One-off tags
+            self.oneoff
+                .iter()
+                .filter(|tag| tag.to_lowercase().starts_with(&prefix.to_lowercase()))
+                .cloned()
+                .collect()
+        } else if prefix.contains(':') {
+            // Custom tags
+            self.custom
+                .iter()
+                .filter(|tag| tag.to_lowercase().starts_with(&prefix.to_lowercase()))
+                .cloned()
+                .collect()
+        } else {
+            // Fallback to all tags
+            self.matching_prefix(prefix)
+        }
     }
 }
 

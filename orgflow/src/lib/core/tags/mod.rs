@@ -108,6 +108,71 @@ impl TagCollection {
     pub fn new() -> Self {
         TagCollection(Vec::new())
     }
+    
+    /// Create a TagCollection from a Vec<Tag>
+    pub fn from_tags(tags: Vec<Tag>) -> Self {
+        TagCollection(tags)
+    }
+
+    /// Extract all unique context tags (@context) as strings
+    pub fn context_tags(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|tag| match tag {
+                Tag::Context(ctx) => Some(format!("@{}", ctx)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Extract all unique project tags (+project) as strings
+    pub fn project_tags(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|tag| match tag {
+                Tag::Project(proj) => Some(format!("+{}", proj)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Extract all unique person tags (p:person) as strings
+    pub fn person_tags(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|tag| match tag {
+                Tag::Person(person) => Some(format!("p:{}", person)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Extract all unique custom tags (key:value) as strings
+    pub fn custom_tags(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|tag| match tag {
+                Tag::Custom(key, value) => Some(format!("{}:{}", key, value)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Extract all unique one-off tags (!tag) as strings
+    pub fn oneoff_tags(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|tag| match tag {
+                Tag::OneOff(oneoff) => Some(format!("!{}", oneoff)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Get all tags as formatted strings
+    pub fn all_tags(&self) -> Vec<String> {
+        self.0.iter().map(|tag| tag.to_string()).collect()
+    }
 }
 
 impl Default for TagCollection {

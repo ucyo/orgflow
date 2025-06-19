@@ -1,9 +1,13 @@
-use orgflow::{Configuration, Note, OrgDocument, Task};
+use orgflow::{Configuration, Note, OrgDocument, Task, TagSuggestions, Tag, TagCollection};
 use std::io;
 use std::io::Result as IoResult;
+use std::str::FromStr;
 
 mod session;
 use session::{SessionManager, SessionState};
+
+mod autocompletion;
+use autocompletion::AutocompletionWidget;
 
 use ratatui::crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Direction, Rect};
@@ -48,6 +52,9 @@ struct App {
     session_manager: SessionManager,
     document_path: String,
     has_unsaved_changes: bool,
+    tag_suggestions: TagSuggestions,
+    autocompletion: AutocompletionWidget,          // For scratchpad
+    title_autocompletion: AutocompletionWidget,    // For note titles
 }
 
 #[derive(Debug)]
@@ -57,7 +64,7 @@ enum AppTab {
     Tasks,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum NoteFocus {
     Title,
     Content,
@@ -128,6 +135,11 @@ impl<'a> App {
             session_state.scratchpad_cursor_pos,
         );
 
+        // Extract tag suggestions from document
+        let tag_suggestions = document.collect_unique_tags();
+        let autocompletion = AutocompletionWidget::new();
+        let title_autocompletion = AutocompletionWidget::new();
+
         let app = App {
             document,
             exit: false,
@@ -142,6 +154,9 @@ impl<'a> App {
             session_manager,
             document_path,
             has_unsaved_changes: session_state.has_unsaved_changes,
+            tag_suggestions,
+            autocompletion,
+            title_autocompletion,
         };
         Ok(app)
     }
@@ -246,6 +261,14 @@ impl<'a> App {
             {
                 self.save_note()?;
             }
+            (KeyEventKind::Press, KeyCode::Esc, _, _) if self.scratchpad_visible && self.autocompletion.is_visible() => {
+                // Hide autocompletion but don't close scratchpad
+                self.autocompletion.hide();
+            }
+            (KeyEventKind::Press, KeyCode::Esc, AppTab::Editor, NoteFocus::Title) if self.title_autocompletion.is_visible() => {
+                // Hide title autocompletion
+                self.title_autocompletion.hide();
+            }
             (KeyEventKind::Press, KeyCode::Esc, _, _) => {
                 if self.scratchpad_visible {
                     // First ESC closes the scratchpad
@@ -265,9 +288,32 @@ impl<'a> App {
 
                 self.scratchpad = TextArea::default();
                 self.has_unsaved_changes = false;
+                
+                // Update tag suggestions after adding new task
+                self.tag_suggestions = self.document.collect_unique_tags();
+            }
+            // Autocompletion handling in scratchpad
+            (KeyEventKind::Press, KeyCode::Up, _, _) if self.scratchpad_visible && self.autocompletion.is_visible() => {
+                self.autocompletion.select_previous();
+            }
+            (KeyEventKind::Press, KeyCode::Down, _, _) if self.scratchpad_visible && self.autocompletion.is_visible() => {
+                self.autocompletion.select_next();
+            }
+            (KeyEventKind::Press, KeyCode::Tab, _, _) if self.scratchpad_visible && self.autocompletion.is_visible() => {
+                // Apply the selected suggestion
+                if let Some((new_text, _cursor_pos)) = self.autocompletion.apply_selected(&self.scratchpad.lines().join(" ")) {
+                    // Replace the text content
+                    self.scratchpad = TextArea::from(vec![new_text]);
+                    // Move cursor to the end of the inserted tag
+                    self.scratchpad.move_cursor(tui_textarea::CursorMove::End);
+                    self.autocompletion.hide();
+                }
             }
             (_, _, _, _) if self.scratchpad_visible => {
                 self.scratchpad.input(key_event);
+                // Update autocompletion suggestions after input
+                let current_text = self.scratchpad.lines().join(" ");
+                self.autocompletion.update_suggestions(&current_text, &self.tag_suggestions);
             }
             // Editor tab specific key handling
             (KeyEventKind::Press, KeyCode::BackTab, AppTab::Editor, NoteFocus::Content) => {
@@ -279,17 +325,59 @@ impl<'a> App {
             (KeyEventKind::Press, KeyCode::Enter, AppTab::Editor, NoteFocus::Title) => {
                 self.note_focus = NoteFocus::Content
             }
+            // Title autocompletion handling
+            (KeyEventKind::Press, KeyCode::Up, AppTab::Editor, NoteFocus::Title) if self.title_autocompletion.is_visible() => {
+                self.title_autocompletion.select_previous();
+            }
+            (KeyEventKind::Press, KeyCode::Down, AppTab::Editor, NoteFocus::Title) if self.title_autocompletion.is_visible() => {
+                self.title_autocompletion.select_next();
+            }
+            (KeyEventKind::Press, KeyCode::Tab, AppTab::Editor, NoteFocus::Title) if self.title_autocompletion.is_visible() => {
+                // Apply the selected suggestion
+                if let Some((new_text, _cursor_pos)) = self.title_autocompletion.apply_selected(&self.title.lines().join(" ")) {
+                    self.title = TextArea::from(vec![new_text]);
+                    self.title.move_cursor(tui_textarea::CursorMove::End);
+                    self.title_autocompletion.hide();
+                }
+            }
             (KeyEventKind::Press, KeyCode::Tab, AppTab::Editor, NoteFocus::Title) => {
                 self.note_focus = NoteFocus::Content
             }
             (_, _, AppTab::Editor, NoteFocus::Content) => _ = self.note.input(key_event),
-            (_, _, AppTab::Editor, NoteFocus::Title) => _ = self.title.input(key_event),
+            (_, _, AppTab::Editor, NoteFocus::Title) => {
+                self.title.input(key_event);
+                // Update autocompletion suggestions after input
+                let current_text = self.title.lines().join(" ");
+                self.title_autocompletion.update_suggestions(&current_text, &self.tag_suggestions);
+            }
             // Ignore other inputs in viewer mode
             (_, _, AppTab::Viewer, _) => {}
             // Ignore other inputs in tasks mode
             (_, _, AppTab::Tasks, _) => {}
         }
         Ok(())
+    }
+
+    /// Extract tags from text (title or content)
+    fn extract_tags_from_text(&self, text: &str) -> Vec<Tag> {
+        let mut tags = Vec::new();
+        
+        // Split text into words and look for tag patterns
+        for word in text.split_whitespace() {
+            if let Ok(tag) = Tag::from_str(word) {
+                tags.push(tag);
+            }
+        }
+        
+        tags
+    }
+
+    /// Remove tags from text, returning the cleaned text
+    fn remove_tags_from_text(&self, text: &str) -> String {
+        text.split_whitespace()
+            .filter(|word| Tag::from_str(word).is_err()) // Keep words that are NOT valid tags
+            .collect::<Vec<&str>>()
+            .join(" ")
     }
 
     fn save_note(&mut self) -> io::Result<()> {
@@ -301,13 +389,36 @@ impl<'a> App {
         let has_content = content.iter().any(|line| !line.trim().is_empty());
 
         if has_title || has_content {
-            // Ensure we always have a non-empty title
-            let final_title = if title.trim().is_empty() {
+            // Extract tags from title and content
+            let mut extracted_tags = Vec::new();
+            extracted_tags.extend(self.extract_tags_from_text(&title));
+            for line in &content {
+                extracted_tags.extend(self.extract_tags_from_text(line));
+            }
+
+            // Remove tags from title to get clean title
+            let clean_title = self.remove_tags_from_text(&title);
+            let final_title = if clean_title.trim().is_empty() {
                 "Untitled Note".to_string()
             } else {
-                title
+                clean_title
             };
-            let note = Note::with(final_title, content);
+
+            // Remove tags from content to get clean content
+            let clean_content: Vec<String> = content
+                .iter()
+                .map(|line| self.remove_tags_from_text(line))
+                .filter(|line| !line.trim().is_empty()) // Remove empty lines
+                .collect();
+
+            // Create note with extracted tags
+            let note = if !extracted_tags.is_empty() {
+                let tag_collection = TagCollection::from_tags(extracted_tags);
+                Note::with_tags(final_title, clean_content, tag_collection)
+            } else {
+                Note::with(final_title, clean_content)
+            };
+            
             self.document.push_note(note);
 
             // Save to file
@@ -318,6 +429,9 @@ impl<'a> App {
             self.note = TextArea::default();
             self.note_focus = NoteFocus::Title;
             self.has_unsaved_changes = false;
+            
+            // Update tag suggestions after adding new note
+            self.tag_suggestions = self.document.collect_unique_tags();
         }
         Ok(())
     }
@@ -424,6 +538,18 @@ fn render_note_editor(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
     if app.scratchpad_visible {
         scratchpad.set_block(scratchpad_block);
         scratchpad.render(scratchpad_area, buf);
+        
+        // Render autocompletion popup if visible
+        if app.autocompletion.is_visible() {
+            // Calculate cursor position within the scratchpad
+            let cursor_line = scratchpad.cursor().0;
+            let cursor_col = scratchpad.cursor().1;
+            let cursor_pos = (
+                scratchpad_area.x + 1 + cursor_col as u16, // +1 for border
+                scratchpad_area.y + 1 + cursor_line as u16, // +1 for border
+            );
+            app.autocompletion.render(area, buf, cursor_pos);
+        }
     }
 
     // Render each of the contents
@@ -432,6 +558,18 @@ fn render_note_editor(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
 
     title.set_block(title_block);
     title.render(title_area, buf);
+    
+    // Render title autocompletion popup if visible
+    if app.title_autocompletion.is_visible() && app.note_focus == NoteFocus::Title && !app.scratchpad_visible {
+        // Calculate cursor position within the title
+        let cursor_line = title.cursor().0;
+        let cursor_col = title.cursor().1;
+        let cursor_pos = (
+            title_area.x + 1 + cursor_col as u16, // +1 for border
+            title_area.y + 1 + cursor_line as u16, // +1 for border
+        );
+        app.title_autocompletion.render(area, buf, cursor_pos);
+    }
 }
 
 fn render_note_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {

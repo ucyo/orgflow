@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Smart IO optimization (saves after 500ms inactivity or 50 keystrokes)
   - Session data stored in `session.json` in the base folder
   - Atomic file operations for reliable session persistence
+- **Tag Autocompletion System**: Intelligent tag suggestions with real-time completion
+  - Smart prefix detection for all tag types (@context, +project, p:person, !oneoff, key:value)
+  - Type-specific popup titles (Context, Project, Person, Custom, OneOff)
+  - Keyboard navigation (↑/↓ to navigate, Tab to select, Esc to close)
+  - Real-time suggestion updates based on existing document tags
+  - Available in both task scratchpad (Ctrl+T) and note title fields
+- **Enhanced Note Creation**: Automatic tag extraction and metadata integration
+  - Tags typed in note titles are automatically extracted and added to note metadata
+  - Clean separation: tags removed from display text, preserved in structured metadata
+  - Support for mixed tag types in single title/content
+  - Automatic tag database updates when new notes are saved
 
 ### Enhanced
 - **TUI Application**: Improved user experience with seamless workflow continuity
@@ -37,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `session.rs` module with `SessionManager` and `SessionState` types
 - Integrated session management into main application event loop
 - Memory-efficient state tracking with minimal overhead
+- New `autocompletion.rs` module with `AutocompletionWidget` and `TagType` system
+- Extended `TagCollection` with tag extraction methods and `from_tags` constructor
+- Added `Note::with_tags()` method for creating notes with embedded tag metadata
+- Enhanced `OrgDocument` with `collect_unique_tags()` for suggestion generation
 
 ### Fixed
 - **Document Loading**: Fixed panic when loading notes without content from refile.org files
