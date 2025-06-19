@@ -113,10 +113,10 @@ impl<'a> App {
         let note_focus = session_state.note_focus;
         let scratchpad_visible = session_state.scratchpad_visible;
 
-        // Restore draft content from session
-        let title = SessionManager::restore_textarea(&session_state.title_content);
-        let note = SessionManager::restore_textarea(&session_state.note_content);
-        let scratchpad = SessionManager::restore_textarea(&session_state.scratchpad_content);
+        // Restore draft content from session with cursor positions
+        let title = SessionManager::restore_textarea_with_cursor(&session_state.title_content, session_state.title_cursor_pos);
+        let note = SessionManager::restore_textarea_with_cursor(&session_state.note_content, session_state.note_cursor_pos);
+        let scratchpad = SessionManager::restore_textarea_with_cursor(&session_state.scratchpad_content, session_state.scratchpad_cursor_pos);
 
         let app = App {
             document,
