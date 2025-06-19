@@ -21,6 +21,11 @@ pub struct SessionState {
     pub note_content: Vec<String>,
     pub scratchpad_content: Vec<String>,
     
+    // Cursor positions for text areas
+    pub title_cursor_pos: (usize, usize),
+    pub note_cursor_pos: (usize, usize),
+    pub scratchpad_cursor_pos: (usize, usize),
+    
     // File metadata
     pub document_path: String,
     pub last_save_timestamp: u64,
@@ -38,6 +43,9 @@ impl Default for SessionState {
             title_content: Vec::new(),
             note_content: Vec::new(),
             scratchpad_content: Vec::new(),
+            title_cursor_pos: (0, 0),
+            note_cursor_pos: (0, 0),
+            scratchpad_cursor_pos: (0, 0),
             document_path: String::new(),
             last_save_timestamp: 0,
             has_unsaved_changes: false,
@@ -121,6 +129,11 @@ impl SessionManager {
         self.state.title_content = title.lines().iter().map(|s| s.to_string()).collect();
         self.state.note_content = note.lines().iter().map(|s| s.to_string()).collect();
         self.state.scratchpad_content = scratchpad.lines().iter().map(|s| s.to_string()).collect();
+        
+        // Update cursor positions
+        self.state.title_cursor_pos = title.cursor();
+        self.state.note_cursor_pos = note.cursor();
+        self.state.scratchpad_cursor_pos = scratchpad.cursor();
 
         // Update metadata
         self.state.document_path = document_path.to_string();
@@ -213,6 +226,22 @@ impl SessionManager {
         } else {
             TextArea::from(content.to_vec())
         }
+    }
+    
+    /// Create TextArea from saved content and restore cursor position
+    pub fn restore_textarea_with_cursor(content: &[String], cursor_pos: (usize, usize)) -> TextArea<'static> {
+        let mut textarea = if content.is_empty() {
+            TextArea::default()
+        } else {
+            TextArea::from(content.to_vec())
+        };
+        
+        // Restore cursor position using CursorMove::Jump
+        textarea.move_cursor(tui_textarea::CursorMove::Jump(
+            cursor_pos.0 as u16, 
+            cursor_pos.1 as u16
+        ));
+        textarea
     }
 }
 
