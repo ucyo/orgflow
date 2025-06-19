@@ -230,7 +230,15 @@ impl<'a> App {
             {
                 self.save_note()?;
             }
-            (KeyEventKind::Press, KeyCode::Esc, _, _) => self.exit = true,
+            (KeyEventKind::Press, KeyCode::Esc, _, _) => {
+                if self.scratchpad_visible {
+                    // First ESC closes the scratchpad
+                    self.scratchpad_visible = false;
+                } else {
+                    // Second ESC (or first ESC when scratchpad isn't visible) exits the app
+                    self.exit = true;
+                }
+            }
             (KeyEventKind::Press, KeyCode::Enter, _, _) if self.scratchpad_visible => {
                 let task = self.scratchpad.lines().first().unwrap();
                 let t = Task::with_today(task);
@@ -681,6 +689,7 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
         metadata_display.render(metadata_area, buf);
     }
 }
+
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     let popup_layout = Layout::default()
