@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed startup crashes when loading existing documents with contentless notes
   - Relaxed validation to allow notes with only title and metadata
   - Better error handling for malformed or incomplete note structures
+- **Navigation**: Streamlined tab switching with cycling interface
+  - Replaced individual 1,2,3 keys with Ctrl+R cycling navigation
+  - Single key combination cycles through Editor → Viewer → Tasks → Editor
+  - Frees up number keys for potential future features
 
 ### Technical
 - Added `serde` and `serde_json` dependencies for session serialization
