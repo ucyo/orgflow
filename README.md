@@ -105,6 +105,11 @@ A beautiful, responsive terminal interface featuring:
 - Highlighted selection with underlines
 - Priority and date tracking
 
+### Navigation
+- **Streamlined Tab Switching**: Single Ctrl+R key cycles through all tabs (Editor → Viewer → Tasks)
+- **Session Recovery**: All navigation state preserved between sessions
+- **Keyboard-driven**: Efficient workflow without mouse dependency
+
 ## 📖 Documentation
 
 ### Installation
@@ -201,7 +206,7 @@ Ideas for improving the user experience:
 orgflow
 
 # Keyboard shortcuts:
-# 1 - Editor tab    2 - Viewer tab    3 - Tasks tab
+# Ctrl+R - Cycle through tabs (Editor → Viewer → Tasks → Editor)
 # Ctrl+T - Quick task entry    Ctrl+S - Save note
 # Esc - Exit (session auto-saved)    Tab - Navigate fields
 # Session state automatically preserved on every keystroke
@@ -322,7 +327,7 @@ cargo check
 ### Editor Tab
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              Orgflow - Editor (1) | Viewer (2) | Tasks (3)  │
+│        Orgflow - Editor | Viewer | Tasks (Ctrl+R to switch) │
 ├─────────────────────────────────────────────────────────────┤
 │ Title                                                       │
 │ Weekly Planning Session                                     │
@@ -337,14 +342,14 @@ cargo check
 │ - Schedule team review meeting                              │
 │ - Update project documentation                              │
 │                                                             │
-│ Quit <ESC> Switch <SHIFT>+<TAB> Save Note <CTRL>+<S>      │
+│ Quit <ESC> Switch <SHIFT>+<TAB> Save <CTRL>+<S> Cycle <CTRL>+<R> │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Tasks Tab
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              Orgflow - Editor (1) | Viewer (2) | Tasks (3)  │
+│        Orgflow - Editor | Viewer | Tasks (Ctrl+R to switch) │
 ├──────────────────────────────────────┬──────────────────────┤
 │ Tasks (5 total)                      │ Task Details         │
 │ ► [ ] Review pull request #123       │ Status: Pending      │
@@ -357,7 +362,7 @@ cargo check
 │                                      │ Review pull request  │
 │                                      │ #123 for the new     │
 │                                      │ authentication...    │
-│ Navigate <↑↓> Quit <ESC>            │                      │
+│ Navigate <↑↓> Quit <ESC> Switch <CTRL>+<R>                  │
 └──────────────────────────────────────┴──────────────────────┘
 ```
 
