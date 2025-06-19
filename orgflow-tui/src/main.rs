@@ -66,7 +66,7 @@ enum NoteFocus {
 impl<'a> App {
     fn new() -> IoResult<Self> {
         let basefolder = Configuration::basefolder();
-        
+
         // Ensure base folder exists with better error handling
         if let Err(e) = std::fs::create_dir_all(&basefolder) {
             eprintln!("Failed to create base folder '{}': {}", basefolder, e);
@@ -74,10 +74,10 @@ impl<'a> App {
             eprintln!("  export ORGFLOW_BASEFOLDER=/tmp/orgflow");
             return Err(e);
         }
-        
+
         let refile_path = std::path::Path::new(&basefolder).join("refile.org");
         let document_path = refile_path.to_str().unwrap().to_string();
-        
+
         // Load document or create empty one if file doesn't exist
         let document = match OrgDocument::from(&document_path) {
             Ok(doc) => doc,
@@ -86,8 +86,9 @@ impl<'a> App {
 
         // Initialize session manager
         let session_file_path = std::path::Path::new(&basefolder).join("session.json");
-        let mut session_manager = SessionManager::new(session_file_path.to_str().unwrap().to_string());
-        
+        let mut session_manager =
+            SessionManager::new(session_file_path.to_str().unwrap().to_string());
+
         // Load existing session or create default
         let session_state = match session_manager.load_session() {
             Ok(state) => state,
@@ -96,7 +97,7 @@ impl<'a> App {
                 SessionState::default()
             }
         };
-        
+
         // Restore UI state from session
         let current_tab = session_state.current_tab;
         // Ensure indices are within bounds for current document
@@ -114,9 +115,18 @@ impl<'a> App {
         let scratchpad_visible = session_state.scratchpad_visible;
 
         // Restore draft content from session with cursor positions
-        let title = SessionManager::restore_textarea_with_cursor(&session_state.title_content, session_state.title_cursor_pos);
-        let note = SessionManager::restore_textarea_with_cursor(&session_state.note_content, session_state.note_cursor_pos);
-        let scratchpad = SessionManager::restore_textarea_with_cursor(&session_state.scratchpad_content, session_state.scratchpad_cursor_pos);
+        let title = SessionManager::restore_textarea_with_cursor(
+            &session_state.title_content,
+            session_state.title_cursor_pos,
+        );
+        let note = SessionManager::restore_textarea_with_cursor(
+            &session_state.note_content,
+            session_state.note_cursor_pos,
+        );
+        let scratchpad = SessionManager::restore_textarea_with_cursor(
+            &session_state.scratchpad_content,
+            session_state.scratchpad_cursor_pos,
+        );
 
         let app = App {
             document,
@@ -146,10 +156,10 @@ impl<'a> App {
             match ratatui::crossterm::event::read()? {
                 ratatui::crossterm::event::Event::Key(key_event) => {
                     self.handle_key_event(key_event)?;
-                    
+
                     // Update session state after each keystroke
                     self.update_session_state();
-                    
+
                     // Check if we should save session (debounced)
                     if self.session_manager.should_save() {
                         let _ = self.session_manager.save_session();
@@ -158,7 +168,7 @@ impl<'a> App {
                 _ => {}
             }
         }
-        
+
         // Force save session on exit
         let _ = self.session_manager.force_save();
         Ok(())
@@ -179,23 +189,28 @@ impl<'a> App {
             &self.current_tab,
             &self.note_focus,
         ) {
-            // Tab switching - only when scratchpad is NOT visible
-            (KeyEventKind::Press, KeyCode::Char('1'), _, _) if !self.scratchpad_visible => {
-                self.current_tab = AppTab::Editor;
-            }
-            (KeyEventKind::Press, KeyCode::Char('2'), _, _) if !self.scratchpad_visible => {
-                self.current_tab = AppTab::Viewer;
-                // Reset note index if out of bounds
-                if self.current_note_index >= self.document.notes.len() {
-                    self.current_note_index = 0;
-                }
-            }
-            (KeyEventKind::Press, KeyCode::Char('3'), _, _) if !self.scratchpad_visible => {
-                self.current_tab = AppTab::Tasks;
-                // Reset task index if out of bounds
-                if self.current_task_index >= self.document.tasks.len() {
-                    self.current_task_index = 0;
-                }
+            // Tab switching with Ctrl+Tab (cycles through tabs) - only when scratchpad is NOT visible
+            (KeyEventKind::Press, KeyCode::Char('r'), _, _)
+                if key_event.modifiers.contains(KeyModifiers::CONTROL)
+                    && !self.scratchpad_visible =>
+            {
+                self.current_tab = match self.current_tab {
+                    AppTab::Editor => {
+                        // Reset note index if out of bounds when switching to Viewer
+                        if self.current_note_index >= self.document.notes.len() {
+                            self.current_note_index = 0;
+                        }
+                        AppTab::Viewer
+                    }
+                    AppTab::Viewer => {
+                        // Reset task index if out of bounds when switching to Tasks
+                        if self.current_task_index >= self.document.tasks.len() {
+                            self.current_task_index = 0;
+                        }
+                        AppTab::Tasks
+                    }
+                    AppTab::Tasks => AppTab::Editor,
+                };
             }
             // Arrow navigation in viewer tab
             (KeyEventKind::Press, KeyCode::Left, AppTab::Viewer, _) => {
@@ -226,7 +241,8 @@ impl<'a> App {
             }
             // Ctrl+S save - put this early to ensure it's not intercepted
             (KeyEventKind::Press, KeyCode::Char('s'), _, _)
-                if key_event.modifiers.contains(KeyModifiers::CONTROL) && !self.scratchpad_visible =>
+                if key_event.modifiers.contains(KeyModifiers::CONTROL)
+                    && !self.scratchpad_visible =>
             {
                 self.save_note()?;
             }
@@ -309,12 +325,12 @@ impl<'a> App {
     /// Update session state with current application state
     fn update_session_state(&mut self) {
         // Check if there are unsaved changes in text areas
-        let has_draft_content = !self.title.lines().is_empty() || 
-                              !self.note.lines().is_empty() || 
-                              !self.scratchpad.lines().is_empty();
-        
+        let has_draft_content = !self.title.lines().is_empty()
+            || !self.note.lines().is_empty()
+            || !self.scratchpad.lines().is_empty();
+
         let has_unsaved = self.has_unsaved_changes || has_draft_content;
-        
+
         self.session_manager.update_state(
             &self.current_tab,
             self.current_note_index,
@@ -356,7 +372,7 @@ fn render_note_editor(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
     let [appname_area, title_area, content_area] = vertical_layout.areas(area);
 
     // Render title in the vertical area
-    Line::from("Orgflow - Editor (1) | Viewer (2) | Tasks (3)")
+    Line::from("Orgflow - Editor | Viewer | Tasks (Ctrl+R to switch)")
         .bold()
         .centered()
         .render(appname_area, buf);
@@ -382,8 +398,8 @@ fn render_note_editor(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
         "<CTRL>+<S> ".blue().bold(),
         "Enter Task ".into(),
         "<CTRL>+<T> ".blue().bold(),
-        "Tasks ".into(),
-        "<3> ".blue().bold(),
+        "Switch ".into(),
+        "<CTRL>+<R> ".blue().bold(),
     ])
     .centered();
     let note_block = Block::default()
@@ -430,7 +446,7 @@ fn render_note_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
     let [appname_area, navigation_area, main_area] = vertical_layout.areas(area);
 
     // Render title in the vertical area
-    Line::from("Orgflow - Editor (1) | Viewer (2) | Tasks (3)")
+    Line::from("Orgflow - Editor | Viewer | Tasks (Ctrl+R to switch)")
         .bold()
         .centered()
         .render(appname_area, buf);
@@ -467,12 +483,8 @@ fn render_note_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
                 Line::from(vec![
                     " Quit ".into(),
                     "<ESC> ".blue().bold(),
-                    "Editor ".into(),
-                    "<1> ".blue().bold(),
-                    "Viewer ".into(),
-                    "<2> ".blue().bold(),
-                    "Tasks ".into(),
-                    "<3> ".blue().bold(),
+                    "Switch ".into(),
+                    "<CTRL>+<TAB> ".blue().bold(),
                 ])
                 .centered(),
             );
@@ -510,12 +522,8 @@ fn render_note_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
                 Line::from(vec![
                     " Quit ".into(),
                     "<ESC> ".blue().bold(),
-                    "Editor ".into(),
-                    "<1> ".blue().bold(),
-                    "Viewer ".into(),
-                    "<2> ".blue().bold(),
-                    "Tasks ".into(),
-                    "<3> ".blue().bold(),
+                    "Switch ".into(),
+                    "<CTRL>+<TAB> ".blue().bold(),
                 ])
                 .centered(),
             );
@@ -550,7 +558,7 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
     let [appname_area, main_area] = vertical_layout.areas(area);
 
     // Render title in the vertical area
-    Line::from("Orgflow - Editor (1) | Viewer (2) | Tasks (3)")
+    Line::from("Orgflow - Editor | Viewer | Tasks (Ctrl+R to switch)")
         .bold()
         .centered()
         .render(appname_area, buf);
@@ -567,12 +575,8 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
                 Line::from(vec![
                     " Quit ".into(),
                     "<ESC> ".blue().bold(),
-                    "Editor ".into(),
-                    "<1> ".blue().bold(),
-                    "Viewer ".into(),
-                    "<2> ".blue().bold(),
-                    "Tasks ".into(),
-                    "<3> ".blue().bold(),
+                    "Switch ".into(),
+                    "<CTRL>+<TAB> ".blue().bold(),
                 ])
                 .centered(),
             );
@@ -599,12 +603,8 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
                 "<ESC> ".blue().bold(),
                 "Navigate ".into(),
                 "<↑↓> ".blue().bold(),
-                "Editor ".into(),
-                "<1> ".blue().bold(),
-                "Viewer ".into(),
-                "<2> ".blue().bold(),
-                "Tasks ".into(),
-                "<3> ".blue().bold(),
+                "Switch ".into(),
+                "<CTRL>+<TAB> ".blue().bold(),
             ])
             .centered(),
         );
@@ -618,29 +618,27 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
         if i >= inner_area.height as usize {
             break; // Don't render beyond the available space
         }
-        
+
         let y = inner_area.y + i as u16;
         let prefix = if i == current_index { "► " } else { "  " };
         let status = if task.is_completed() { "[x]" } else { "[ ]" };
         let text = format!("{}{} {}", prefix, status, task.description());
-        
+
         let style = if i == current_index {
             Style::default().add_modifier(ratatui::style::Modifier::UNDERLINED)
         } else {
             Style::default()
         };
-        
-        Line::from(text)
-            .style(style)
-            .render(
-                ratatui::layout::Rect {
-                    x: inner_area.x,
-                    y,
-                    width: inner_area.width,
-                    height: 1,
-                },
-                buf,
-            );
+
+        Line::from(text).style(style).render(
+            ratatui::layout::Rect {
+                x: inner_area.x,
+                y,
+                width: inner_area.width,
+                height: 1,
+            },
+            buf,
+        );
     }
 
     // Display metadata for current task
@@ -689,7 +687,6 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
         metadata_display.render(metadata_area, buf);
     }
 }
-
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     let popup_layout = Layout::default()
