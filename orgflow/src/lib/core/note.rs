@@ -62,6 +62,16 @@ impl Note {
             ..Default::default()
         }
     }
+    
+    /// Create a new note with title, content, and tags
+    pub fn with_tags(title: String, content: Vec<String>, tags: TagCollection) -> Self {
+        Self {
+            title,
+            content,
+            tags,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for Note {
