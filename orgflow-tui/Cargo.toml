@@ -1,6 +1,6 @@
 [package]
 name = "orgflow-tui"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 description = "A terminal user interface for orgflow - manage notes and tasks with a smooth workflow"
 license = "MIT"
