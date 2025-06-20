@@ -2,3 +2,5 @@
 .claude/
 CLAUDE.md
 test/
+.DS_Store
+.env
