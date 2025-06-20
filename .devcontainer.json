@@ -14,5 +14,9 @@
             ]
         }
     },
-    "postStartCommand": "claude"
+    "postStartCommand": "claude",
+    "runArgs": [
+        "--env-file",
+        ".env"
+    ]
 }
