@@ -19,6 +19,9 @@ orgflow = { version = "0.2.0", path = "../orgflow" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
+[dev-dependencies]
+tempfile = "3.10"
+
 [[bin]]
 name = "orgflow"
 path = "src/main.rs"

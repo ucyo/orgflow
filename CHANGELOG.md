@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic completion date setting when marking tasks as complete
   - Changes are automatically saved to the org file
   - Updated help text to show SPACE key functionality
+- **Task Filtering & Sorting System**: Advanced task management with persistent state
+  - Dynamic command panel accessible via 'c' key in Tasks tab
+  - Filter tasks by project tags with intelligent project detection
+  - "No Project" filter to show tasks without any project tags
+  - Sort tasks by completion status (completed tasks at bottom)
+  - "Clear All Filters & Sorting" option to reset all filters
+  - Dynamic panel sizing that adjusts to show all available options
+  - Complete session persistence for filter and sort preferences
 
 ### Enhanced
 - **TUI Application**: Improved user experience with seamless workflow continuity

@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tui_textarea::TextArea;
 
-use crate::{AppTab, NoteFocus};
+use crate::{AppTab, NoteFocus, CommandPanel, TaskFilter, TaskSort};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionState {
@@ -30,6 +30,14 @@ pub struct SessionState {
     pub document_path: String,
     pub last_save_timestamp: u64,
     pub has_unsaved_changes: bool,
+    
+    // Command Panel State
+    pub command_panel: CommandPanel,
+    pub command_panel_selection: usize,
+    
+    // Task Management State
+    pub task_filter: TaskFilter,
+    pub task_sort: TaskSort,
 }
 
 impl Default for SessionState {
@@ -49,6 +57,10 @@ impl Default for SessionState {
             document_path: String::new(),
             last_save_timestamp: 0,
             has_unsaved_changes: false,
+            command_panel: CommandPanel::Hidden,
+            command_panel_selection: 0,
+            task_filter: TaskFilter::None,
+            task_sort: TaskSort::None,
         }
     }
 }
@@ -117,6 +129,10 @@ impl SessionManager {
         scratchpad: &TextArea<'static>,
         document_path: &str,
         has_unsaved_changes: bool,
+        command_panel: &CommandPanel,
+        command_panel_selection: usize,
+        task_filter: &TaskFilter,
+        task_sort: &TaskSort,
     ) {
         // Update UI state
         self.state.current_tab = current_tab.clone();
@@ -138,6 +154,12 @@ impl SessionManager {
         // Update metadata
         self.state.document_path = document_path.to_string();
         self.state.has_unsaved_changes = has_unsaved_changes;
+        
+        // Update command panel and task management state
+        self.state.command_panel = command_panel.clone();
+        self.state.command_panel_selection = command_panel_selection;
+        self.state.task_filter = task_filter.clone();
+        self.state.task_sort = task_sort.clone();
 
         // Track change timing
         self.last_change_time = Instant::now();
@@ -245,77 +267,95 @@ impl SessionManager {
     }
 }
 
-/// Helper trait to add session support to existing enums
-impl Clone for AppTab {
-    fn clone(&self) -> Self {
-        match self {
-            AppTab::Editor => AppTab::Editor,
-            AppTab::Viewer => AppTab::Viewer,
-            AppTab::Tasks => AppTab::Tasks,
-        }
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
 
-impl Clone for NoteFocus {
-    fn clone(&self) -> Self {
-        match self {
-            NoteFocus::Title => NoteFocus::Title,
-            NoteFocus::Content => NoteFocus::Content,
-        }
+    #[test]
+    fn test_session_persistence_with_command_panel_state() {
+        // Create a temporary file for session storage
+        let temp_file = NamedTempFile::new().unwrap();
+        let session_path = temp_file.path().to_str().unwrap().to_string();
+        
+        // Create a session manager and set some state
+        let mut session_manager = SessionManager::new(session_path.clone());
+        
+        let mut state = SessionState::default();
+        state.command_panel = CommandPanel::FilterByProject;
+        state.command_panel_selection = 2;
+        state.task_filter = TaskFilter::Project("+webdev".to_string());
+        state.task_sort = TaskSort::Status;
+        
+        session_manager.state = state;
+        
+        // Save the session
+        session_manager.force_save().unwrap();
+        
+        // Create a new session manager and load the state
+        let mut new_session_manager = SessionManager::new(session_path);
+        let loaded_state = new_session_manager.load_session().unwrap();
+        
+        // Verify the command panel state was persisted
+        assert_eq!(loaded_state.command_panel, CommandPanel::FilterByProject);
+        assert_eq!(loaded_state.command_panel_selection, 2);
+        assert_eq!(loaded_state.task_filter, TaskFilter::Project("+webdev".to_string()));
+        assert_eq!(loaded_state.task_sort, TaskSort::Status);
     }
-}
 
-// Serde implementations for enums
-impl Serialize for AppTab {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            AppTab::Editor => serializer.serialize_str("Editor"),
-            AppTab::Viewer => serializer.serialize_str("Viewer"),
-            AppTab::Tasks => serializer.serialize_str("Tasks"),
-        }
+    #[test]
+    fn test_clear_all_filters_and_sorting() {
+        // Test that the clear all functionality works correctly
+        let temp_file = NamedTempFile::new().unwrap();
+        let session_path = temp_file.path().to_str().unwrap().to_string();
+        
+        let mut session_manager = SessionManager::new(session_path.clone());
+        
+        // Set up some filters and sorting
+        let mut state = SessionState::default();
+        state.task_filter = TaskFilter::Project("+testing".to_string());
+        state.task_sort = TaskSort::Status;
+        
+        session_manager.state = state;
+        
+        // Simulate clearing all filters and sorting (as would happen when user selects option 2)
+        session_manager.state.task_filter = TaskFilter::None;
+        session_manager.state.task_sort = TaskSort::None;
+        
+        // Verify state is cleared
+        assert_eq!(session_manager.state.task_filter, TaskFilter::None);
+        assert_eq!(session_manager.state.task_sort, TaskSort::None);
+        
+        // Save and reload to verify persistence
+        session_manager.force_save().unwrap();
+        let mut new_session_manager = SessionManager::new(session_path);
+        let loaded_state = new_session_manager.load_session().unwrap();
+        
+        // Verify cleared state persisted
+        assert_eq!(loaded_state.task_filter, TaskFilter::None);
+        assert_eq!(loaded_state.task_sort, TaskSort::None);
     }
-}
 
-impl<'de> Deserialize<'de> for AppTab {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "Editor" => Ok(AppTab::Editor),
-            "Viewer" => Ok(AppTab::Viewer),
-            "Tasks" => Ok(AppTab::Tasks),
-            _ => Ok(AppTab::Editor), // Default fallback
-        }
-    }
-}
-
-impl Serialize for NoteFocus {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            NoteFocus::Title => serializer.serialize_str("Title"),
-            NoteFocus::Content => serializer.serialize_str("Content"),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for NoteFocus {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "Title" => Ok(NoteFocus::Title),
-            "Content" => Ok(NoteFocus::Content),
-            _ => Ok(NoteFocus::Title), // Default fallback
-        }
+    #[test]
+    fn test_no_project_filter_persistence() {
+        // Test that the NoProject filter state persists correctly
+        let temp_file = NamedTempFile::new().unwrap();
+        let session_path = temp_file.path().to_str().unwrap().to_string();
+        
+        let mut session_manager = SessionManager::new(session_path.clone());
+        
+        // Set NoProject filter
+        let mut state = SessionState::default();
+        state.task_filter = TaskFilter::NoProject;
+        
+        session_manager.state = state;
+        
+        // Save and reload
+        session_manager.force_save().unwrap();
+        let mut new_session_manager = SessionManager::new(session_path);
+        let loaded_state = new_session_manager.load_session().unwrap();
+        
+        // Verify NoProject filter persisted
+        assert_eq!(loaded_state.task_filter, TaskFilter::NoProject);
     }
 }

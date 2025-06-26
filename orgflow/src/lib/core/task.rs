@@ -256,4 +256,35 @@ mod tests {
         assert!(!task.is_completed());
         assert!(task.completion_date().is_none());
     }
+
+    #[test]
+    fn test_task_with_project_tags() {
+        let task = Task::with_today("Fix login bug +webdev @work");
+        
+        // Should have tags
+        assert!(task.tags().is_some());
+        
+        if let Some(tags) = task.tags() {
+            let project_tags = tags.project_tags();
+            assert_eq!(project_tags.len(), 1);
+            assert_eq!(project_tags[0], "+webdev");
+        }
+        
+        // Description should not include tags
+        assert_eq!(task.description(), "Fix login bug");
+    }
+
+    #[test]
+    fn test_multiple_project_tags() {
+        let task = Task::with_today("Update documentation +docs +website");
+        
+        if let Some(tags) = task.tags() {
+            let project_tags = tags.project_tags();
+            assert_eq!(project_tags.len(), 2);
+            assert!(project_tags.contains(&"+docs".to_string()));
+            assert!(project_tags.contains(&"+website".to_string()));
+        }
+        
+        assert_eq!(task.description(), "Update documentation");
+    }
 }
