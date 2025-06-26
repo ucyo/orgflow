@@ -249,6 +249,14 @@ impl<'a> App {
                     self.current_task_index += 1;
                 }
             }
+            // Toggle task completion with SPACE
+            (KeyEventKind::Press, KeyCode::Char(' '), AppTab::Tasks, _) => {
+                if let Some(task) = self.document.tasks.get_mut(self.current_task_index) {
+                    task.toggle_completion();
+                    // Save to file immediately
+                    let _ = self.document.to(&self.document_path);
+                }
+            }
             (KeyEventKind::Press, KeyCode::Char('t'), _, _)
                 if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
             {
@@ -741,8 +749,10 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
                 "<ESC> ".blue().bold(),
                 "Navigate ".into(),
                 "<↑↓> ".blue().bold(),
+                "Toggle ".into(),
+                "<SPACE> ".blue().bold(),
                 "Switch ".into(),
-                "<CTRL>+<TAB> ".blue().bold(),
+                "<CTRL>+<R> ".blue().bold(),
             ])
             .centered(),
         );

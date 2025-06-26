@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clean separation: tags removed from display text, preserved in structured metadata
   - Support for mixed tag types in single title/content
   - Automatic tag database updates when new notes are saved
+- **Task Toggle Functionality**: Mark tasks as done or undone using SPACE key
+  - Press SPACE in Tasks tab to toggle completion status of selected task
+  - Automatic completion date setting when marking tasks as complete
+  - Changes are automatically saved to the org file
+  - Updated help text to show SPACE key functionality
 
 ### Enhanced
 - **TUI Application**: Improved user experience with seamless workflow continuity

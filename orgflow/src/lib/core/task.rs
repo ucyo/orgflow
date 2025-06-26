@@ -44,6 +44,15 @@ impl Task {
     pub fn tags(&self) -> &Option<TagCollection> {
         &self.tags
     }
+    
+    pub fn toggle_completion(&mut self) {
+        self.is_completed = !self.is_completed;
+        if self.is_completed {
+            self.completion_date = Some(Date::now());
+        } else {
+            self.completion_date = None;
+        }
+    }
     pub fn with_task(description: String) -> Self {
         Self {
             description,
@@ -227,5 +236,24 @@ mod tests {
             let result = Task::from_str(&val);
             assert!(result.is_err(), "\n{}\n=>\n{:?}\n", val, result);
         }
+    }
+
+    #[test]
+    fn test_toggle_completion() {
+        let mut task = Task::with_task("Test task".to_string());
+        
+        // Initially not completed
+        assert!(!task.is_completed());
+        assert!(task.completion_date().is_none());
+        
+        // Toggle to completed
+        task.toggle_completion();
+        assert!(task.is_completed());
+        assert!(task.completion_date().is_some());
+        
+        // Toggle back to not completed
+        task.toggle_completion();
+        assert!(!task.is_completed());
+        assert!(task.completion_date().is_none());
     }
 }
