@@ -133,11 +133,11 @@ impl OrgDocument {
 /// Collection of tag suggestions for autocompletion
 #[derive(Debug, Clone)]
 pub struct TagSuggestions {
-    pub context: Vec<String>,   // @context
-    pub project: Vec<String>,   // +project
-    pub person: Vec<String>,    // p:person
-    pub custom: Vec<String>,    // key:value
-    pub oneoff: Vec<String>,    // !oneoff
+    pub context: Vec<String>, // @context
+    pub project: Vec<String>, // +project
+    pub person: Vec<String>,  // p:person
+    pub custom: Vec<String>,  // key:value
+    pub oneoff: Vec<String>,  // !oneoff
 }
 
 impl TagSuggestions {

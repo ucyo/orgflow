@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tui_textarea::TextArea;
 
-use crate::{AppTab, NoteFocus, CommandPanel, TaskFilter, TaskSort};
+use crate::{AppTab, CommandPanel, NoteFocus, TaskFilter, TaskSort};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionState {
@@ -15,26 +15,26 @@ pub struct SessionState {
     pub current_task_index: usize,
     pub note_focus: NoteFocus,
     pub scratchpad_visible: bool,
-    
+
     // Draft Content (unsaved work)
     pub title_content: Vec<String>,
     pub note_content: Vec<String>,
     pub scratchpad_content: Vec<String>,
-    
+
     // Cursor positions for text areas
     pub title_cursor_pos: (usize, usize),
     pub note_cursor_pos: (usize, usize),
     pub scratchpad_cursor_pos: (usize, usize),
-    
+
     // File metadata
     pub document_path: String,
     pub last_save_timestamp: u64,
     pub has_unsaved_changes: bool,
-    
+
     // Command Panel State
     pub command_panel: CommandPanel,
     pub command_panel_selection: usize,
-    
+
     // Task Management State
     pub task_filter: TaskFilter,
     pub task_sort: TaskSort,
@@ -93,7 +93,7 @@ impl SessionManager {
     pub fn load_session(&mut self) -> io::Result<SessionState> {
         // Always start with a valid default state
         self.state = SessionState::default();
-        
+
         if Path::new(&self.session_file_path).exists() {
             match fs::read_to_string(&self.session_file_path) {
                 Ok(content) => {
@@ -118,7 +118,8 @@ impl SessionManager {
     }
 
     /// Update session state from current app state
-    pub fn update_state(&mut self, 
+    pub fn update_state(
+        &mut self,
         current_tab: &AppTab,
         current_note_index: usize,
         current_task_index: usize,
@@ -145,7 +146,7 @@ impl SessionManager {
         self.state.title_content = title.lines().iter().map(|s| s.to_string()).collect();
         self.state.note_content = note.lines().iter().map(|s| s.to_string()).collect();
         self.state.scratchpad_content = scratchpad.lines().iter().map(|s| s.to_string()).collect();
-        
+
         // Update cursor positions
         self.state.title_cursor_pos = title.cursor();
         self.state.note_cursor_pos = note.cursor();
@@ -154,7 +155,7 @@ impl SessionManager {
         // Update metadata
         self.state.document_path = document_path.to_string();
         self.state.has_unsaved_changes = has_unsaved_changes;
-        
+
         // Update command panel and task management state
         self.state.command_panel = command_panel.clone();
         self.state.command_panel_selection = command_panel_selection;
@@ -205,7 +206,7 @@ impl SessionManager {
 
         // Atomic write: write to temp file first, then rename
         let temp_path = format!("{}.tmp", self.session_file_path);
-        
+
         {
             let mut file = fs::File::create(&temp_path)?;
             file.write_all(json_content.as_bytes())?;
@@ -235,10 +236,10 @@ impl SessionManager {
 
     /// Check if there are unsaved drafts that would be lost
     pub fn has_unsaved_drafts(&self) -> bool {
-        !self.state.title_content.is_empty() || 
-        !self.state.note_content.is_empty() || 
-        !self.state.scratchpad_content.is_empty() ||
-        self.state.has_unsaved_changes
+        !self.state.title_content.is_empty()
+            || !self.state.note_content.is_empty()
+            || !self.state.scratchpad_content.is_empty()
+            || self.state.has_unsaved_changes
     }
 
     /// Create TextArea from saved content
@@ -249,19 +250,22 @@ impl SessionManager {
             TextArea::from(content.to_vec())
         }
     }
-    
+
     /// Create TextArea from saved content and restore cursor position
-    pub fn restore_textarea_with_cursor(content: &[String], cursor_pos: (usize, usize)) -> TextArea<'static> {
+    pub fn restore_textarea_with_cursor(
+        content: &[String],
+        cursor_pos: (usize, usize),
+    ) -> TextArea<'static> {
         let mut textarea = if content.is_empty() {
             TextArea::default()
         } else {
             TextArea::from(content.to_vec())
         };
-        
+
         // Restore cursor position using CursorMove::Jump
         textarea.move_cursor(tui_textarea::CursorMove::Jump(
-            cursor_pos.0 as u16, 
-            cursor_pos.1 as u16
+            cursor_pos.0 as u16,
+            cursor_pos.1 as u16,
         ));
         textarea
     }
@@ -277,29 +281,32 @@ mod tests {
         // Create a temporary file for session storage
         let temp_file = NamedTempFile::new().unwrap();
         let session_path = temp_file.path().to_str().unwrap().to_string();
-        
+
         // Create a session manager and set some state
         let mut session_manager = SessionManager::new(session_path.clone());
-        
+
         let mut state = SessionState::default();
         state.command_panel = CommandPanel::FilterByProject;
         state.command_panel_selection = 2;
         state.task_filter = TaskFilter::Project("+webdev".to_string());
         state.task_sort = TaskSort::Status;
-        
+
         session_manager.state = state;
-        
+
         // Save the session
         session_manager.force_save().unwrap();
-        
+
         // Create a new session manager and load the state
         let mut new_session_manager = SessionManager::new(session_path);
         let loaded_state = new_session_manager.load_session().unwrap();
-        
+
         // Verify the command panel state was persisted
         assert_eq!(loaded_state.command_panel, CommandPanel::FilterByProject);
         assert_eq!(loaded_state.command_panel_selection, 2);
-        assert_eq!(loaded_state.task_filter, TaskFilter::Project("+webdev".to_string()));
+        assert_eq!(
+            loaded_state.task_filter,
+            TaskFilter::Project("+webdev".to_string())
+        );
         assert_eq!(loaded_state.task_sort, TaskSort::Status);
     }
 
@@ -308,29 +315,29 @@ mod tests {
         // Test that the clear all functionality works correctly
         let temp_file = NamedTempFile::new().unwrap();
         let session_path = temp_file.path().to_str().unwrap().to_string();
-        
+
         let mut session_manager = SessionManager::new(session_path.clone());
-        
+
         // Set up some filters and sorting
         let mut state = SessionState::default();
         state.task_filter = TaskFilter::Project("+testing".to_string());
         state.task_sort = TaskSort::Status;
-        
+
         session_manager.state = state;
-        
+
         // Simulate clearing all filters and sorting (as would happen when user selects option 2)
         session_manager.state.task_filter = TaskFilter::None;
         session_manager.state.task_sort = TaskSort::None;
-        
+
         // Verify state is cleared
         assert_eq!(session_manager.state.task_filter, TaskFilter::None);
         assert_eq!(session_manager.state.task_sort, TaskSort::None);
-        
+
         // Save and reload to verify persistence
         session_manager.force_save().unwrap();
         let mut new_session_manager = SessionManager::new(session_path);
         let loaded_state = new_session_manager.load_session().unwrap();
-        
+
         // Verify cleared state persisted
         assert_eq!(loaded_state.task_filter, TaskFilter::None);
         assert_eq!(loaded_state.task_sort, TaskSort::None);
@@ -341,20 +348,20 @@ mod tests {
         // Test that the NoProject filter state persists correctly
         let temp_file = NamedTempFile::new().unwrap();
         let session_path = temp_file.path().to_str().unwrap().to_string();
-        
+
         let mut session_manager = SessionManager::new(session_path.clone());
-        
+
         // Set NoProject filter
         let mut state = SessionState::default();
         state.task_filter = TaskFilter::NoProject;
-        
+
         session_manager.state = state;
-        
+
         // Save and reload
         session_manager.force_save().unwrap();
         let mut new_session_manager = SessionManager::new(session_path);
         let loaded_state = new_session_manager.load_session().unwrap();
-        
+
         // Verify NoProject filter persisted
         assert_eq!(loaded_state.task_filter, TaskFilter::NoProject);
     }

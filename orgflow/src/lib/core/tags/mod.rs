@@ -108,7 +108,7 @@ impl TagCollection {
     pub fn new() -> Self {
         TagCollection(Vec::new())
     }
-    
+
     /// Create a TagCollection from a Vec<Tag>
     pub fn from_tags(tags: Vec<Tag>) -> Self {
         TagCollection(tags)
