@@ -50,6 +50,7 @@ struct App {
     current_tab: AppTab,
     current_note_index: usize,
     current_task_index: usize,
+    task_scroll_offset: usize,
     session_manager: SessionManager,
     document_path: String,
     has_unsaved_changes: bool,
@@ -184,6 +185,7 @@ impl<'a> App {
             current_tab,
             current_note_index,
             current_task_index,
+            task_scroll_offset: 0,
             session_manager,
             document_path,
             has_unsaved_changes: session_state.has_unsaved_changes,
@@ -231,7 +233,13 @@ impl<'a> App {
         Ok(())
     }
     /// Routine about how to draw each frame in application
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame) {
+        // Pre-calculate scroll offset for tasks if we're in task view
+        if let AppTab::Tasks = self.current_tab {
+            // Estimate visible height based on screen size (rough approximation)
+            let estimated_visible_height = (frame.area().height as usize).saturating_sub(4);
+            self.update_task_scroll_with_height(estimated_visible_height);
+        }
         frame.render_widget(self, frame.area());
     }
 
@@ -284,11 +292,13 @@ impl<'a> App {
             (KeyEventKind::Press, KeyCode::Up, AppTab::Tasks, _) if self.command_panel == CommandPanel::Hidden => {
                 if self.current_task_index > 0 {
                     self.current_task_index -= 1;
+                    self.update_task_scroll();
                 }
             }
             (KeyEventKind::Press, KeyCode::Down, AppTab::Tasks, _) if self.command_panel == CommandPanel::Hidden => {
                 if self.current_task_index < self.filtered_tasks.len().saturating_sub(1) {
                     self.current_task_index += 1;
+                    self.update_task_scroll();
                 }
             }
             // Toggle task completion with SPACE
@@ -664,6 +674,25 @@ impl<'a> App {
         if self.current_task_index >= self.filtered_tasks.len() {
             self.current_task_index = 0;
         }
+        // Reset scroll offset when filters/sorting change
+        self.task_scroll_offset = 0;
+        self.update_task_scroll();
+    }
+
+    /// Update task scroll offset to keep current task visible
+    fn update_task_scroll(&mut self) {
+        // We'll calculate this dynamically in render since we need the visible height
+        // This method exists for future enhancements
+    }
+    
+    /// Update task scroll offset with a given visible height
+    fn update_task_scroll_with_height(&mut self, visible_height: usize) {
+        // Ensure current selection is visible
+        if self.current_task_index < self.task_scroll_offset {
+            self.task_scroll_offset = self.current_task_index;
+        } else if self.current_task_index >= self.task_scroll_offset + visible_height {
+            self.task_scroll_offset = self.current_task_index.saturating_sub(visible_height - 1);
+        }
     }
 
     /// Update session state with current application state
@@ -696,6 +725,20 @@ impl<'a> App {
 
 /// Give App itself the ability to be a Widget (if there is only one widget )
 impl<'a> Widget for &App {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+    where
+        Self: Sized,
+    {
+        match self.current_tab {
+            AppTab::Editor => render_note_editor(self, area, buf),
+            AppTab::Viewer => render_note_viewer(self, area, buf),
+            AppTab::Tasks => render_task_viewer(self, area, buf),
+        }
+    }
+}
+
+/// Give mutable App the ability to be a Widget as well
+impl<'a> Widget for &mut App {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
@@ -1016,14 +1059,21 @@ fn render_task_viewer(app: &App, area: ratatui::prelude::Rect, buf: &mut ratatui
     let inner_area = task_list_block.inner(task_list_area);
     task_list_block.render(task_list_area, buf);
 
-    // Render each task line with appropriate styling
-    for (display_index, &actual_task_index) in app.filtered_tasks.iter().enumerate() {
-        if display_index >= inner_area.height as usize {
-            break; // Don't render beyond the available space
-        }
+    // Use the pre-calculated scroll offset
+    let scroll_offset = app.task_scroll_offset;
+    let visible_height = inner_area.height as usize;
 
+    // Render each task line with appropriate styling, starting from scroll offset
+    let tasks_to_render = app.filtered_tasks.iter()
+        .enumerate()
+        .skip(scroll_offset)
+        .take(visible_height);
+
+    for (display_index, &actual_task_index) in tasks_to_render {
+        let line_index = display_index - scroll_offset;
+        
         if let Some(task) = app.document.tasks.get(actual_task_index) {
-            let y = inner_area.y + display_index as u16;
+            let y = inner_area.y + line_index as u16;
             let prefix = if display_index == current_index { "► " } else { "  " };
             let status = if task.is_completed() { "[x]" } else { "[ ]" };
             let text = format!("{}{} {}", prefix, status, task.description());

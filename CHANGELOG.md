@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Clear All Filters & Sorting" option to reset all filters
   - Dynamic panel sizing that adjusts to show all available options
   - Complete session persistence for filter and sort preferences
+- **Task List Scrolling**: Proper scrolling support for long task lists
+  - Automatic scrolling when navigating beyond visible area with arrow keys
+  - Selected task always remains visible in the viewport
+  - Smooth scroll offset tracking maintains proper positioning
+  - Works seamlessly with filtering and sorting features
 
 ### Enhanced
 - **TUI Application**: Improved user experience with seamless workflow continuity
