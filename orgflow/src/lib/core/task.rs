@@ -20,29 +20,38 @@ impl Task {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn is_completed(&self) -> bool {
         self.is_completed
     }
-    
+
     pub fn priority_level(&self) -> &Option<Priority> {
         &self.priority_level
     }
-    
+
     pub fn completion_date(&self) -> &Option<Date> {
         &self.completion_date
     }
-    
+
     pub fn creation_date(&self) -> &Option<Date> {
         &self.creation_date
     }
-    
+
     pub fn description(&self) -> &str {
         &self.description
     }
-    
+
     pub fn tags(&self) -> &Option<TagCollection> {
         &self.tags
+    }
+
+    pub fn toggle_completion(&mut self) {
+        self.is_completed = !self.is_completed;
+        if self.is_completed {
+            self.completion_date = Some(Date::now());
+        } else {
+            self.completion_date = None;
+        }
     }
     pub fn with_task(description: String) -> Self {
         Self {
@@ -227,5 +236,55 @@ mod tests {
             let result = Task::from_str(&val);
             assert!(result.is_err(), "\n{}\n=>\n{:?}\n", val, result);
         }
+    }
+
+    #[test]
+    fn test_toggle_completion() {
+        let mut task = Task::with_task("Test task".to_string());
+
+        // Initially not completed
+        assert!(!task.is_completed());
+        assert!(task.completion_date().is_none());
+
+        // Toggle to completed
+        task.toggle_completion();
+        assert!(task.is_completed());
+        assert!(task.completion_date().is_some());
+
+        // Toggle back to not completed
+        task.toggle_completion();
+        assert!(!task.is_completed());
+        assert!(task.completion_date().is_none());
+    }
+
+    #[test]
+    fn test_task_with_project_tags() {
+        let task = Task::with_today("Fix login bug +webdev @work");
+
+        // Should have tags
+        assert!(task.tags().is_some());
+
+        if let Some(tags) = task.tags() {
+            let project_tags = tags.project_tags();
+            assert_eq!(project_tags.len(), 1);
+            assert_eq!(project_tags[0], "+webdev");
+        }
+
+        // Description should not include tags
+        assert_eq!(task.description(), "Fix login bug");
+    }
+
+    #[test]
+    fn test_multiple_project_tags() {
+        let task = Task::with_today("Update documentation +docs +website");
+
+        if let Some(tags) = task.tags() {
+            let project_tags = tags.project_tags();
+            assert_eq!(project_tags.len(), 2);
+            assert!(project_tags.contains(&"+docs".to_string()));
+            assert!(project_tags.contains(&"+website".to_string()));
+        }
+
+        assert_eq!(task.description(), "Update documentation");
     }
 }

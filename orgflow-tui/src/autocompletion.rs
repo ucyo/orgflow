@@ -16,12 +16,12 @@ pub struct AutocompletionWidget {
 
 #[derive(Debug, Clone)]
 enum TagType {
-    Context,    // @context
-    Project,    // +project
-    Person,     // p:person
-    Custom,     // key:value
-    OneOff,     // !oneoff
-    Mixed,      // Multiple types or unknown
+    Context, // @context
+    Project, // +project
+    Person,  // p:person
+    Custom,  // key:value
+    OneOff,  // !oneoff
+    Mixed,   // Multiple types or unknown
 }
 
 impl AutocompletionWidget {
@@ -38,11 +38,11 @@ impl AutocompletionWidget {
     /// Update suggestions based on current input and available tags
     pub fn update_suggestions(&mut self, input: &str, tag_suggestions: &TagSuggestions) {
         self.current_input = input.to_string();
-        
+
         // Find the last word that looks like a tag (starts with @, +, p:, !, or contains :)
         let words: Vec<&str> = input.split_whitespace().collect();
         let last_word = words.last().unwrap_or(&"");
-        
+
         if self.is_tag_prefix(last_word) {
             self.suggestions = tag_suggestions.suggestions_for_prefix(last_word);
             self.current_tag_type = self.determine_tag_type(last_word);
@@ -60,7 +60,7 @@ impl AutocompletionWidget {
         if word.is_empty() {
             return false;
         }
-        
+
         // Check for various tag prefixes
         word.starts_with('@')       // @context
             || word.starts_with('+') // +project
@@ -92,7 +92,7 @@ impl AutocompletionWidget {
     fn get_tag_type_display(&self) -> &'static str {
         match self.current_tag_type {
             TagType::Context => "Context",
-            TagType::Project => "Project", 
+            TagType::Project => "Project",
             TagType::Person => "Person",
             TagType::Custom => "Custom",
             TagType::OneOff => "OneOff",
@@ -163,7 +163,8 @@ impl AutocompletionWidget {
 
         // Calculate popup position (below cursor, but within screen bounds)
         let popup_height = (self.suggestions.len() as u16 + 2).min(8); // Max 6 suggestions + borders
-        let popup_width = self.suggestions
+        let popup_width = self
+            .suggestions
             .iter()
             .map(|s| s.len() as u16)
             .max()
@@ -204,13 +205,12 @@ impl AutocompletionWidget {
             .collect();
 
         // Create the list widget
-        let list = List::new(items)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(self.get_tag_type_display())
-                    .style(Style::default().bg(Color::DarkGray)),
-            );
+        let list = List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(self.get_tag_type_display())
+                .style(Style::default().bg(Color::DarkGray)),
+        );
 
         // Render the popup
         ratatui::widgets::Clear.render(popup_area, buf);
@@ -231,7 +231,11 @@ mod tests {
 
     fn create_test_suggestions() -> TagSuggestions {
         TagSuggestions {
-            context: vec!["@work".to_string(), "@home".to_string(), "@phone".to_string()],
+            context: vec![
+                "@work".to_string(),
+                "@home".to_string(),
+                "@phone".to_string(),
+            ],
             project: vec!["+project1".to_string(), "+urgent".to_string()],
             person: vec!["p:john".to_string(), "p:alice".to_string()],
             custom: vec!["priority:high".to_string(), "status:done".to_string()],
@@ -243,9 +247,9 @@ mod tests {
     fn test_context_tag_suggestions() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         widget.update_suggestions("This is a task @w", &suggestions);
-        
+
         assert!(widget.is_visible());
         assert_eq!(widget.suggestions, vec!["@work"]);
     }
@@ -254,9 +258,9 @@ mod tests {
     fn test_project_tag_suggestions() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         widget.update_suggestions("Task +p", &suggestions);
-        
+
         assert!(widget.is_visible());
         assert_eq!(widget.suggestions, vec!["+project1"]);
     }
@@ -265,9 +269,9 @@ mod tests {
     fn test_no_suggestions_for_regular_text() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         widget.update_suggestions("This is regular text", &suggestions);
-        
+
         assert!(!widget.is_visible());
     }
 
@@ -275,10 +279,10 @@ mod tests {
     fn test_apply_selected() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         widget.update_suggestions("Task @w", &suggestions);
         let result = widget.apply_selected("Task @w");
-        
+
         assert_eq!(result, Some(("Task @work ".to_string(), 11))); // 11 is the length "Task @work "
     }
 
@@ -286,38 +290,47 @@ mod tests {
     fn test_apply_selected_cursor_position() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         // Test with context tag
         widget.update_suggestions("Do something @h", &suggestions);
         let result = widget.apply_selected("Do something @h");
         let expected_text = "Do something @home ";
-        assert_eq!(result, Some((expected_text.to_string(), expected_text.len())));
-        
+        assert_eq!(
+            result,
+            Some((expected_text.to_string(), expected_text.len()))
+        );
+
         // Test with project tag
         widget.update_suggestions("Fix bug +p", &suggestions);
         let result = widget.apply_selected("Fix bug +p");
         let expected_text = "Fix bug +project1 ";
-        assert_eq!(result, Some((expected_text.to_string(), expected_text.len())));
-        
+        assert_eq!(
+            result,
+            Some((expected_text.to_string(), expected_text.len()))
+        );
+
         // Test with person tag
         widget.update_suggestions("Ask p:a", &suggestions);
         let result = widget.apply_selected("Ask p:a");
         let expected_text = "Ask p:alice ";
-        assert_eq!(result, Some((expected_text.to_string(), expected_text.len())));
+        assert_eq!(
+            result,
+            Some((expected_text.to_string(), expected_text.len()))
+        );
     }
 
     #[test]
     fn test_navigation() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         widget.update_suggestions("@", &suggestions);
-        
+
         assert_eq!(widget.selected_index, 0);
-        
+
         widget.select_next();
         assert_eq!(widget.selected_index, 1);
-        
+
         widget.select_previous();
         assert_eq!(widget.selected_index, 0);
     }
@@ -326,30 +339,45 @@ mod tests {
     fn test_tag_type_detection() {
         let mut widget = AutocompletionWidget::new();
         let suggestions = create_test_suggestions();
-        
+
         // Test context tag type
         widget.update_suggestions("Task @w", &suggestions);
         assert_eq!(widget.get_tag_type_display(), "Context");
-        
+
         // Test project tag type
         widget.update_suggestions("Fix +p", &suggestions);
         assert_eq!(widget.get_tag_type_display(), "Project");
-        
+
         // Test person tag type
         widget.update_suggestions("Ask p:a", &suggestions);
         assert_eq!(widget.get_tag_type_display(), "Person");
-        
+
         // Test oneoff tag type
         widget.update_suggestions("Note !i", &suggestions);
         assert_eq!(widget.get_tag_type_display(), "OneOff");
-        
+
         // Test custom tag type (would need custom suggestions to actually show)
         widget.determine_tag_type("priority:"); // Direct test of method
         // Since update_suggestions filters, we test the method directly
-        assert!(matches!(widget.determine_tag_type("priority:high"), TagType::Custom));
-        assert!(matches!(widget.determine_tag_type("@work"), TagType::Context));
-        assert!(matches!(widget.determine_tag_type("+project"), TagType::Project));
-        assert!(matches!(widget.determine_tag_type("p:john"), TagType::Person));
-        assert!(matches!(widget.determine_tag_type("!urgent"), TagType::OneOff));
+        assert!(matches!(
+            widget.determine_tag_type("priority:high"),
+            TagType::Custom
+        ));
+        assert!(matches!(
+            widget.determine_tag_type("@work"),
+            TagType::Context
+        ));
+        assert!(matches!(
+            widget.determine_tag_type("+project"),
+            TagType::Project
+        ));
+        assert!(matches!(
+            widget.determine_tag_type("p:john"),
+            TagType::Person
+        ));
+        assert!(matches!(
+            widget.determine_tag_type("!urgent"),
+            TagType::OneOff
+        ));
     }
 }
