@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Selected task always remains visible in the viewport
   - Smooth scroll offset tracking maintains proper positioning
   - Works seamlessly with filtering and sorting features
+- **Universal Task Entry**: Task creation available from all tabs
+  - Task entry scratchpad (Ctrl+T) now visible and functional on all three tabs
+  - Consistent overlay positioning and styling across Editor, Viewer, and Tasks tabs
+  - Tag autocompletion works seamlessly regardless of current tab
+  - Smart input handling prevents conflicts with tab-specific shortcuts
 
 ### Enhanced
 - **TUI Application**: Improved user experience with seamless workflow continuity
@@ -77,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Keyboard Input**: Fixed Ctrl+S save functionality to work from any tab (not just Editor)
 - **Scratchpad Input**: Fixed tab switching (1-3) interfering with text input in scratchpad
 - **Base Path Configuration**: Improved default path logic using HOME environment variable
+- **Task Entry Input Conflicts**: Fixed keyboard input conflicts in Tasks tab when task entry is open
+  - Space key now properly enters spaces in task text instead of toggling task completion
+  - Arrow keys navigate autocompletion instead of moving through task list
+  - Input handling properly isolated when scratchpad overlay is active
 - **File Operations**: Replaced unsafe try_into().unwrap() with safe into() conversions
 - **Content Validation**: Enhanced logic to distinguish meaningful content from whitespace
 - **Session Loading**: Added graceful error handling for corrupted session files
